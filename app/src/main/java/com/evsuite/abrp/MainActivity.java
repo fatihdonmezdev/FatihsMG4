@@ -12,6 +12,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -60,6 +61,10 @@ public class MainActivity extends AppCompatActivity {
     private TextInputEditText tokenInput;
     private SwitchMaterial    serviceSwitch;
     private SwitchMaterial    autostartSwitch;
+    private SwitchMaterial    windowCloseSwitch;
+    private CompoundButton.OnCheckedChangeListener windowCloseListener;
+    private TextView          windowCloseStatus;
+    private TextView          windowCloseLog;
     private TextView          statusText;
     private Button            testButton;
     private View              connectionStatusRow;
@@ -170,6 +175,7 @@ public class MainActivity extends AppCompatActivity {
             refreshCallLog();
             refreshVehicle();
             refreshWifi();
+            refreshWindowClose();
             uiHandler.postDelayed(this, 2_000L);
         }
     };
@@ -210,6 +216,7 @@ public class MainActivity extends AppCompatActivity {
 
         bindVehiclePane();
         bindWifiPane();
+        bindWindowClose();
 
         apiKeyLayout        = abrpPane.findViewById(R.id.api_key_layout);
         apiKeyInput         = abrpPane.findViewById(R.id.api_key_input);
@@ -316,6 +323,48 @@ public class MainActivity extends AppCompatActivity {
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         }
+    }
+
+    private void bindWindowClose() {
+        windowCloseSwitch = servicePane.findViewById(R.id.window_close_switch);
+        windowCloseStatus = servicePane.findViewById(R.id.window_close_status);
+        windowCloseLog = servicePane.findViewById(R.id.window_close_log);
+        windowCloseListener = (button, enabled) -> {
+            prefs.edit().putBoolean(WindowCloseService.KEY_ENABLED, enabled).apply();
+            if (enabled) WindowCloseService.startIfEnabled(this);
+            else stopService(new Intent(this, WindowCloseService.class));
+            refreshWindowClose();
+        };
+        windowCloseSwitch.setChecked(prefs.getBoolean(WindowCloseService.KEY_ENABLED, false));
+        windowCloseSwitch.setOnCheckedChangeListener(windowCloseListener);
+        // A build that cannot reach the vehicle service would accept the toggle and then fail
+        // every command, which reads as a broken feature rather than an inapplicable one.
+        if (!WindowCloseService.canWriteToVehicle()) windowCloseSwitch.setEnabled(false);
+        WindowCloseService.startIfEnabled(this);
+        refreshWindowClose();
+    }
+
+    private void refreshWindowClose() {
+        if (windowCloseSwitch == null) return;
+        boolean enabled = prefs.getBoolean(WindowCloseService.KEY_ENABLED, false);
+        if (windowCloseSwitch.isChecked() != enabled) {
+            // Detached first: setChecked re-enters the listener, which would write the pref
+            // and restart the service on every one of these two-second refreshes.
+            windowCloseSwitch.setOnCheckedChangeListener(null);
+            windowCloseSwitch.setChecked(enabled);
+            windowCloseSwitch.setOnCheckedChangeListener(windowCloseListener);
+        }
+        FirmwareInfo.Gen generation = FirmwareInfo.INSTANCE.getGeneration();
+        if (!WindowCloseService.canWriteToVehicle()) {
+            windowCloseStatus.setText(R.string.window_close_no_system_uid);
+        } else if (!enabled) {
+            windowCloseStatus.setText(R.string.window_close_stopped);
+        } else if (generation != FirmwareInfo.Gen.UNKNOWN && generation != FirmwareInfo.Gen.SWI69) {
+            windowCloseStatus.setText(R.string.window_close_unsupported);
+        } else {
+            windowCloseStatus.setText(WindowCloseService.statusResource());
+        }
+        windowCloseLog.setText(WindowCloseService.eventLog());
     }
 
     @Override

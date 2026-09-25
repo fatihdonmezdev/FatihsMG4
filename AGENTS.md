@@ -15,9 +15,11 @@ Fork of Leon Kernan's `ABRP_Uploader`. See `LICENSE.md` — the licence status i
 
 ## Non-negotiables
 
-1. **Read-only towards the car.** This app must never write a vehicle property. The
-   sibling EVProfile project writes settings and gates every write on 0 km/h; this one has
-   no business writing at all. A write path is a bug.
+1. **Telemetry is read-only.** The explicitly requested SWI69 WinClose integration is
+   the only vehicle-write exception: an opt-in service closes the four windows on the
+   WinClose door callback, requiring P and readable 0 km/h before and during the pulse.
+   It uses WinClose's CarState/VSM interfaces and the shared VehicleWriteGate; no other
+   vehicle settings may be written. Always send STOP when an active pulse exits.
 2. **A failed read is not a zero.** Getters return `Integer`/`Float`/`Boolean` and `null`
    means "could not read". Null fields are omitted from the payload. Sending 0 for SOC
    tells ABRP the battery is empty and wrecks a live route plan.
@@ -41,6 +43,9 @@ UploadLog           last 20 attempts + derived service state — pure, unit-test
 SecurePrefs         credentials in EncryptedSharedPreferences, migrates plaintext
 AbrpApi             HTTP; credentials in the POST body, never the query string
 MainActivity        configuration, service state, upload log
+WindowCloseService independent, opt-in foreground service; no ABRP/GPS dependency
+WinCloseHardware   SWI69 adapter derived from the sibling winclose/WindowHardware.kt
+WindowClosePulse   bounded UP/STOP sequence; pure, unit-tested
 ```
 
 **Put logic in the pure classes.** Anything Android-free can be unit-tested on the JVM;

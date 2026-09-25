@@ -24,6 +24,9 @@ otherwise, arising from, out of or in connection with the software or its use.
   data once sent.
 - Reading vehicle properties uses **undocumented runtime interfaces**. They can change or
   disappear with any firmware update.
+- Optional WinClose automation sends window-closing commands. Sensorless Comfort windows
+  cannot confirm completion; command timing and motor/anti-pinch behavior have not been
+  verified on this vehicle. Check physical operation while parked before relying on it.
 
 ## Not affiliated
 

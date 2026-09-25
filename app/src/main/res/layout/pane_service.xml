@@ -12,6 +12,54 @@
         android:orientation="vertical"
         android:padding="@dimen/spacing_lg">
 
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/spacing_md"
+            app:cardBackgroundColor="@color/ev_surface"
+            app:cardCornerRadius="@dimen/ev_corner"
+            app:strokeColor="@color/ev_outline"
+            app:strokeWidth="1dp"
+            app:cardElevation="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="@dimen/spacing_lg">
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/window_close_switch"
+                    style="@style/Widget.EV.Switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="@dimen/touch_target"
+                    android:text="@string/window_close_title" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/window_close_hint"
+                    android:textAppearance="@style/Text.EV.Secondary" />
+
+                <TextView
+                    android:id="@+id/window_close_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/spacing_sm"
+                    android:text="@string/window_close_stopped"
+                    android:textAppearance="@style/Text.EV.Body" />
+
+                <TextView
+                    android:id="@+id/window_close_log"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/spacing_sm"
+                    android:maxLines="4"
+                    android:textAppearance="@style/Text.EV.Secondary" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- Service control card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"

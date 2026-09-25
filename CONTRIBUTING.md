@@ -4,8 +4,9 @@ This app runs on a car. That single fact drives everything below.
 
 ## Ground rules
 
-1. **The app never writes to the vehicle.** It is read-only towards the car. A patch that
-   introduces a write will be rejected regardless of how useful the feature is.
+1. **Telemetry never writes to the vehicle.** The opt-in SWI69 WinClose integration is
+   the only write exception: four-window closing, gated on P and readable 0 km/h,
+   with a bounded pulse and STOP on completion, interruption or failure.
 2. **A property that cannot be read is omitted, never defaulted.** Sending 0 for an
    unreadable battery level tells ABRP the car is empty and corrupts the user's route
    plan. Nullable in, absent from the payload.

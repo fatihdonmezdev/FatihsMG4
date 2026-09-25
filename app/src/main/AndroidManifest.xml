@@ -5,6 +5,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Optional local window automation; independent of the location/upload service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- The window close fires exactly as the driver leaves and the head unit heads for
+         suspend. Without a wake lock held across the pulse, the unit can sleep partway
+         through and leave the glass halfway up with no STOP ever sent. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Required from API 33 to post the foreground-service notification, which is the
          only status UI the service has. Without it the notification is silently dropped. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -38,6 +44,7 @@
          outside temperature. From API 30 an explicit bind to a package this app does not
          declare here simply fails, and ext_temp would go back to being unreportable. -->
     <queries>
+        <package android:name="com.saicmotor.launcher" />
         <package android:name="com.saicmotor.mapservice" />
     </queries>
 
@@ -64,6 +71,15 @@
             android:name=".AbrpUploadService"
             android:exported="false"
             android:foregroundServiceType="location" />
+
+        <service
+            android:name=".WindowCloseService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Local MG4 parked front-door monitoring and bounded window closing" />
+        </service>
 
         <!-- The head unit resumes far more often than it cold-boots, and announces the
              resume with QUICKBOOT_POWERON. Listening only for BOOT_COMPLETED is why

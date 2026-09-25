@@ -78,8 +78,9 @@ same rule in time as well as in value: a GPS fix older than `max(5 min, 3 x your
 interval)` is dropped rather than resent, so a stale fix cannot report the car back at the
 place it set off from.
 
-**The app never writes to the car.** It only reads. Any write path would be a bug; see
-[`SECURITY.md`](SECURITY.md).
+Telemetry only reads the car. An optional SWI69 WinClose integration can close the four
+windows while parked; this is the only vehicle-write feature. See configuration below
+and [`SECURITY.md`](SECURITY.md).
 
 ## Install
 The MG4 head unit hides Settings and APK install. The known route in:
@@ -134,6 +135,39 @@ Typing a long API key and token on the car's on-screen keyboard is painful. Inst
 put them in a text file and tap **Import file** — see [Config file](#config-file) below.
 
 ## Configuration
+
+On the **Upload Service** page, **Kapı açılınca camları kapat** enables the WinClose
+integration independently of ABRP. It is off by default and restarts with the head unit
+once enabled; no ABRP token, GPS permission, speed threshold or driving timer is needed.
+
+The integration is adapted from the sibling WinClose `WindowHardware.kt`: SWI69
+`CarStateClient` door callback (transaction 6, value 0) triggers the VSM's
+`setVehicleWindowStatus` on all four areas. WinClose describes this as the driver-door
+signal; passenger-door coverage has not been established. No alternative door-property
+source is used. The car must be in P with readable speed exactly 0 km/h. Comfort windows
+receive UP (1) every 120 ms for five seconds, then STOP (0). P and speed are checked
+during the pulse too. Cancellation, a failed command, or leaving P/stationary state ends
+the pulse and attempts STOP on all windows. Duplicate door events and openings during
+an active pulse do not extend it, and WinClose's 60-second cooldown means reaching back
+into the car does not run a second pulse. A partial wake lock is held across the pulse,
+because the close fires exactly as the head unit is heading for suspend.
+
+The feature is SWI69-only and needs the platform signature: the service stops itself on
+any other known generation, and the switch is disabled when the process does not hold
+system uid (only the unstable flavor declares `android.uid.system`).
+
+**No cancellation is possible on a Comfort trim.** Its window motors carry no position
+sensor, so nothing can observe you working the switch, and there is no way to abort a
+pulse once it starts. Verify the motors' pinch behaviour on a parked car before relying
+on this — the windows travel while the driver's door is open.
+
+No position sensor is assumed: a completed command is not confirmation that the windows
+closed. The existing WinClose pulse duration is the starting value, not a manufacturer
+guarantee. Vehicle testing of timing, permissions and motor behavior is still required.
+The APK keeps its existing application IDs and signing configuration (the unstable flavor
+already uses `android.uid.system`). WinClose's source license is unspecified; see its
+README before redistribution.
+
 | Setting | Default | Notes |
 |---|---|---|
 | Upload frequency | 60 s | 15 / 30 / 60 / 120 / 300 s. Applies while driving |
