@@ -49,7 +49,7 @@ The version comes from the **asset filename**, not the git tag. The tag can stay
 
    ```bash
    BT=~/Android/Sdk/build-tools/35.0.0
-   KEYS=~/Desktop/Coding/LUMINA/DriveHub_Kamera/tools
+   KEYS=~/Desktop/Coding/MG/DriveHub_Kamera/tools
 
    "$BT/zipalign" -f 4 \
      app/build/outputs/apk/unstable/debug/app-unstable-debug.apk aligned.apk
