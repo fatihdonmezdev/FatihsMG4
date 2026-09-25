@@ -124,6 +124,8 @@
     <string name="notif_channel_desc">Shows vehicle telemetry upload status</string>
     <string name="notif_title">ABRP Uploader</string>
     <string name="notif_action_stop">Stop</string>
+    <string name="ota_install_success">Güncelleme kuruldu — uygulamayı yeniden başlatın</string>
+    <string name="ota_install_failed">Kurulum başarısız: %1$s</string>
     <string name="update_check">Güncelleme kontrol et</string>
     <string name="update_checking">Kontrol ediliyor…</string>
     <string name="about_action">About</string>

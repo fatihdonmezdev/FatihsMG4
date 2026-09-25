@@ -1,6 +1,9 @@
 package com.evsuite.abrp;
 
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageInstaller;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -295,27 +298,112 @@ final class OtaUpdater {
         return null;
     }
 
-    static boolean install(Context context, File apk) {
-        if (!signatureMatchesRunningApp(context, apk)) return false;
+    /**
+     * What {@link #install} did. Every value except {@link #SESSION_STARTED} is a refusal,
+     * and they are distinct because the single "imza uyuşmuyor?" message they used to share
+     * sent a perfectly well-signed build to the wrong diagnosis.
+     */
+    enum InstallResult {
+        /** The archive is signed by a different certificate than the running app. */
+        SIGNATURE_MISMATCH,
+        /** The package manager cannot parse the archive, or it is for another package. */
+        UNREADABLE_ARCHIVE,
+        /** Handed to the platform. The outcome arrives at {@link OtaInstallResultReceiver}. */
+        SESSION_STARTED,
+        /** The session could not be created, written or committed. */
+        SESSION_FAILED
+    }
+
+    /**
+     * Hands [apk] to the platform's {@link PackageInstaller}.
+     *
+     * This used to shell out to {@code pm install -r}. That fails on this head unit: the APK
+     * lives in the app's private cache, and the package manager service opens the path from
+     * its own process and SELinux context, where that directory is not readable. The failure
+     * surfaced as a signature error, which it never was.
+     *
+     * A session takes no path. We open the archive ourselves, as the app, and stream the bytes
+     * into the session — so there is no second process that has to be able to read our cache.
+     * The bytes are fully written before commit, which is why the caller may delete the staged
+     * file as soon as this returns.
+     */
+    static InstallResult install(Context context, File apk) {
+        if (!signatureMatchesRunningApp(context, apk)) return InstallResult.SIGNATURE_MISMATCH;
+        if (!archiveIsThisPackage(context, apk)) return InstallResult.UNREADABLE_ARCHIVE;
         try {
-            Process process = new ProcessBuilder("/system/bin/pm", "install", "-r",
-                    apk.getAbsolutePath()).redirectErrorStream(true).start();
-            StringBuilder output = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                    process.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) output.append(line).append('\n');
+            commitSession(context, apk);
+            return InstallResult.SESSION_STARTED;
+        } catch (Throwable t) {
+            Log.w(TAG, "OTA session install failed", t);
+            return InstallResult.SESSION_FAILED;
+        }
+    }
+
+    /**
+     * True if the archive parses and declares our own package name.
+     *
+     * A signature match alone does not say the APK is this app: the same platform key signs
+     * every app on the unit, so a correctly signed archive for some other package would pass
+     * the certificate check and then fail deep inside the installer.
+     */
+    private static boolean archiveIsThisPackage(Context context, File apk) {
+        try {
+            android.content.pm.PackageInfo info = context.getPackageManager()
+                    .getPackageArchiveInfo(apk.getAbsolutePath(), 0);
+            if (info == null || info.packageName == null) {
+                Log.w(TAG, "OTA archive cannot be parsed by the package manager");
+                return false;
             }
-            int exitCode = process.waitFor();
-            return installSucceeded(exitCode, output.toString());
+            if (!context.getPackageName().equals(info.packageName)) {
+                Log.w(TAG, "OTA archive is for " + info.packageName + ", not "
+                        + context.getPackageName());
+                return false;
+            }
+            Log.i(TAG, "OTA archive ok: " + info.packageName + " " + info.versionName);
+            return true;
         } catch (Exception e) {
-            Log.w(TAG, "Update install failed", e);
+            Log.w(TAG, "OTA archive check threw: " + e.getMessage());
             return false;
         }
     }
 
-    static boolean installSucceeded(int exitCode, String output) {
-        return exitCode == 0 && output.contains("Success");
+    private static void commitSession(Context context, File apk) throws Exception {
+        PackageInstaller installer = context.getPackageManager().getPackageInstaller();
+        PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(
+                PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            // Only honoured for an installer the platform already trusts; harmless otherwise,
+            // and this unit is API 28 where the field does not exist at all.
+            params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
+        }
+        int sessionId = installer.createSession(params);
+        PackageInstaller.Session session = null;
+        try {
+            session = installer.openSession(sessionId);
+            try (java.io.InputStream in = new java.io.FileInputStream(apk);
+                 java.io.OutputStream out = session.openWrite("base.apk", 0, apk.length())) {
+                byte[] buffer = new byte[64 * 1024];
+                int count;
+                while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+                session.fsync(out);
+            }
+            Intent callback = new Intent(context, OtaInstallResultReceiver.class)
+                    .setAction(OtaInstallResultReceiver.ACTION_INSTALL_RESULT)
+                    .setPackage(context.getPackageName());
+            // MUTABLE: the platform fills in EXTRA_STATUS and, when it wants the driver to
+            // confirm, EXTRA_INTENT. An immutable PendingIntent would arrive empty.
+            PendingIntent pending = PendingIntent.getBroadcast(context, sessionId, callback,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+            session.commit(pending.getIntentSender());
+            Log.i(TAG, "OTA session " + sessionId + " committed (" + apk.length() + " bytes)");
+            session = null;
+        } finally {
+            // Only reached when commit did not happen; an abandoned session frees its staging.
+            if (session != null) {
+                try { session.abandon(); } catch (Throwable ignored) { }
+                try { session.close(); } catch (Throwable ignored) { }
+            }
+        }
     }
 
     /**

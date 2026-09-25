@@ -1,3 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Unstable channel only. The stable build has no self-update path, so neither the install
+     permission nor the session result receiver belongs in the main manifest. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    android:sharedUserId="android.uid.system" />
+    android:sharedUserId="android.uid.system">
+
+    <!-- Needed for the PackageInstaller session that replaced `pm install -r`. On this
+         platform-signed build the platform may install without asking; when it does ask,
+         this is what lets the confirmation be raised at all. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <application>
+        <receiver
+            android:name=".OtaInstallResultReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.evsuite.abrp.OTA_INSTALL_RESULT" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

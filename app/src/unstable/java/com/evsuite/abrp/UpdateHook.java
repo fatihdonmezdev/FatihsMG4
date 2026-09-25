@@ -12,10 +12,15 @@ import java.io.File;
  * This fork publishes its own builds from its own repository, signed with the platform key
  * the head unit already trusts, so that audit does not govern here and the seam is live.
  *
- * Installation goes through {@code pm install -r}, which only a platform-signed build may
- * call. {@link OtaUpdater#install} checks the downloaded APK's certificate against the
- * running app's first and refuses a mismatch, so an update signed with any other key is
- * deleted rather than installed — the same check that makes an upstream APK unusable here.
+ * Installation goes through the platform {@link android.content.pm.PackageInstaller}, not
+ * {@code pm install -r}: that shelled out with a path inside our private cache, which the
+ * package manager service cannot read from its own process, and the generic failure was
+ * reported as a signature mismatch it never was. {@link OtaUpdater#install} still checks the
+ * downloaded APK's certificate against the running app's first and refuses a mismatch, so an
+ * update signed with any other key is deleted rather than installed.
+ *
+ * Committing a session is asynchronous, so the message this returns says an install has been
+ * started, never that one finished. {@link OtaInstallResultReceiver} has the verdict.
  */
 final class UpdateHook {
 
@@ -78,12 +83,22 @@ final class UpdateHook {
         if (apk == null) return "İndirme başarısız (" + update.versionName + ")";
 
         // The cached APK is cleared whichever way install goes: a rejected archive must not
-        // linger, and an accepted one has already been copied out by the package manager.
-        boolean installed = OtaUpdater.install(app, apk);
+        // linger, and an accepted one has already been streamed into the installer session.
+        OtaUpdater.InstallResult result = OtaUpdater.install(app, apk);
         if (!apk.delete()) Log.w(TAG, "Could not remove cached OTA APK");
 
-        return installed
-                ? "Güncellendi: " + update.versionName + " — yeniden başlatın"
-                : "Kurulum reddedildi (imza uyuşmuyor?)";
+        switch (result) {
+            case SESSION_STARTED:
+                // Deliberately not "Güncellendi": committing a session is not installing. The
+                // platform may still want the driver to confirm, and either way the verdict
+                // arrives at OtaInstallResultReceiver, not here.
+                return "Kuruluyor: " + update.versionName + " — ekrandaki onayı bekleyin";
+            case SIGNATURE_MISMATCH:
+                return "Kurulum reddedildi: imza uyuşmuyor";
+            case UNREADABLE_ARCHIVE:
+                return "Kurulum reddedildi: APK okunamadı";
+            default:
+                return "Kurulum başlatılamadı (" + update.versionName + ") — Log sayfasına bakın";
+        }
     }
 }

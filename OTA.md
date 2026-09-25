@@ -86,16 +86,42 @@ The version comes from the **asset filename**, not the git tag. The tag can stay
 |---|---|
 | `Güncel (2.2.2.0-unstable)` | No release beat the installed version. Check the pre-release tick and the asset filename. |
 | `İndirme başarısız` | Release found, download did not complete. Usually no network. |
-| `Kurulum reddedildi (imza uyuşmuyor?)` | Signed with the wrong key — rebuild and re-sign with `platform.pk8`. |
+| `Kuruluyor: 2.2.3 — ekrandaki onayı bekleyin` | The session was committed. Not done yet: watch for the platform's own toast, or a confirmation dialog to accept. |
+| `Kurulum reddedildi: imza uyuşmuyor` | Genuinely the wrong key — rebuild and re-sign with `platform.pk8`. Unlike the old catch-all, this one means what it says. |
+| `Kurulum reddedildi: APK okunamadı` | The archive does not parse, or it is built for another package. |
+| `Kurulum başlatılamadı … Log sayfasına bakın` | The session could not be created or committed. `adb logcat -s EVABRP.Update`. |
+| `Kurulum başarısız: INSTALL_FAILED_…` | From `OtaInstallResultReceiver` — the package manager's own words for why it refused. |
 | `Güncelleme kontrolü başarısız` | The check threw. `adb logcat -s EVABRP.Update OtaUpdater` if a cable is available; otherwise the in-app Log page. |
 
-## Untested
+## How the install works, and why it is not `pm install`
 
-`OtaUpdater.install()` shells out to `/system/bin/pm install -r`, which only a
-platform-signed app may call. That is what this build is, so it should work — but it has
-never actually run on the car. If installs are refused with a signature that *does* match,
-the fallback is an `ACTION_INSTALL_PACKAGE` intent, which asks the driver to confirm
-instead of installing silently.
+`OtaUpdater.install()` used to shell out to `/system/bin/pm install -r`. On this head unit
+that fails every time, and the reason is worth writing down because the symptom pointed
+somewhere else entirely.
+
+The downloaded APK lives in `context.getCacheDir()`. `pm` does not install the file itself
+— it passes the path to the package manager service, which opens it from *its* process and
+SELinux context, where an app's private cache is not readable. The install failed, and
+because `install()` returned a bare boolean, the caller reported the only failure it knew
+how to name: `Kurulum reddedildi (imza uyuşmuyor?)`. A correctly signed build, refused with
+a signature error it had not earned. The `pm` output that would have said so was captured
+and thrown away.
+
+It now uses the platform `PackageInstaller`: we open the archive ourselves and stream it
+into a session, so no second process ever has to read our cache. The approach is taken from
+[merthankaraman/DriveHub_Dort](https://github.com/merthankaraman/DriveHub_Dort), which hit
+the same wall on the same hardware.
+
+Two consequences for anyone reading a failure:
+
+- **Committing a session is not installing.** `commit()` is asynchronous. The refresh button
+  can only report that an install *started*; the verdict arrives at
+  `OtaInstallResultReceiver` and appears as its own toast.
+- **`STATUS_PENDING_USER_ACTION` is not an error.** The platform is asking the driver to
+  confirm. The receiver launches the confirmation activity the platform hands it.
+
+Still unverified on the car: whether this build installs silently or raises that
+confirmation. Either way it installs, which the old path did not.
 
 ## Why the check is manual
 

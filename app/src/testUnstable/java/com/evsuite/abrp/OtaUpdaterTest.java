@@ -111,10 +111,8 @@ public class OtaUpdaterTest {
         assertArrayEquals(new int[]{1, 0, 5}, OtaUpdater.segments("1.x.5"));
     }
 
-    @Test
-    public void pmInstallRequiresBothSuccessTextAndZeroExit() {
-        assertTrue(OtaUpdater.installSucceeded(0, "Success\n"));
-        assertFalse(OtaUpdater.installSucceeded(1, "Success\n"));
-        assertFalse(OtaUpdater.installSucceeded(0, "Failure [INSTALL_FAILED]"));
-    }
+    // The `pm install -r` exit-code test that stood here is gone with the shell-out it
+    // covered. Installation is now a PackageInstaller session, whose every step needs a real
+    // PackageManager — there is no pure part of it left to exercise on the JVM. What used to
+    // be asserted here is now reported by OtaInstallResultReceiver, on the car.
 }
