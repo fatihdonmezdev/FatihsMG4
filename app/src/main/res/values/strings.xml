@@ -12,12 +12,14 @@
     <string name="window_close_no_system_uid">Bu sürüm araca yazamıyor (sistem imzası gerekli)</string>
     <string name="window_close_notification">P ve 0 km/sa: kapı açılınca dört camı kapat</string>
     <string name="window_close_disable">Kapat</string>
+    <string name="window_close_log_title">Olay kaydı</string>
     <string name="app_name">Fatih\'sMG4</string>
 
     <!-- Main screen -->
     <string name="tab_abrp">ABRP</string>
     <string name="tab_service">Upload Service</string>
     <string name="tab_vehicle">Araç</string>
+    <string name="tab_windows">Pencereler</string>
     <string name="tab_wifi">Wi-Fi</string>
     <string name="tab_log">Log</string>
 

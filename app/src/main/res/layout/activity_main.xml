@@ -73,6 +73,16 @@
             app:icon="@drawable/ic_tab_vehicle" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabWindows"
+            style="@style/Widget.EV.NavTab"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="@dimen/spacing_sm"
+            android:text="@string/tab_windows"
+            app:icon="@drawable/ic_tab_windows" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/tabWifi"
             style="@style/Widget.EV.NavTab"
             android:layout_width="0dp"

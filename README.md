@@ -136,9 +136,10 @@ put them in a text file and tap **Import file** — see [Config file](#config-fi
 
 ## Configuration
 
-On the **Upload Service** page, **Kapı açılınca camları kapat** enables the WinClose
-integration independently of ABRP. It is off by default and restarts with the head unit
-once enabled; no ABRP token, GPS permission, speed threshold or driving timer is needed.
+On its own **Pencereler** page — not under Upload Service, since it shares nothing with
+ABRP — **Kapı açılınca camları kapat** enables the WinClose integration. It is off by
+default and restarts with the head unit once enabled; no ABRP token, GPS permission,
+speed threshold or driving timer is needed.
 
 The integration is adapted from the sibling WinClose `WindowHardware.kt`: SWI69
 `CarStateClient` door callback (transaction 6, value 0) triggers the VSM's

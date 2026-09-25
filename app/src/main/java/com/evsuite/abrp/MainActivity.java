@@ -46,7 +46,8 @@ public class MainActivity extends AppCompatActivity {
 
     /** Top-bar tabs, in page order. Parallel to {@link #panes}. */
     private static final int[] TAB_IDS =
-            { R.id.tabAbrp, R.id.tabService, R.id.tabVehicle, R.id.tabWifi, R.id.tabLog };
+            { R.id.tabAbrp, R.id.tabService, R.id.tabVehicle, R.id.tabWindows, R.id.tabWifi,
+              R.id.tabLog };
 
     // Status colours come from the palette, not from the Material swatches: #4CAF50 and
     // #F44336 sit around 4:1 on this background, which disappears behind a sunlit
@@ -79,9 +80,10 @@ public class MainActivity extends AppCompatActivity {
     private View servicePane;
     private View logPane;
     private View vehiclePane;
+    private View windowsPane;
     private View wifiPane;
 
-    /** The five pages, in the order the top bar lists them. Parallel to {@link #TAB_IDS}. */
+    /** The six pages, in the order the top bar lists them. Parallel to {@link #TAB_IDS}. */
     private View[] panes;
 
     /** Wi-Fi page. The helper is the same one the upload service uses on its own tick. */
@@ -118,7 +120,7 @@ public class MainActivity extends AppCompatActivity {
      * Wires the top bar to the pager: every tab is a page, and every page is a tab.
      *
      * Each page has its own view type, so the pager asks for it once and keeps it: these
-     * three views are the activity's own, held in {@link #panes}, not rows to be recycled.
+     * views are the activity's own, held in {@link #panes}, not rows to be recycled.
      */
     private void setUpPager() {
         ViewPager2 pager = findViewById(R.id.content);
@@ -138,9 +140,11 @@ public class MainActivity extends AppCompatActivity {
                 // state, exactly as they did when they were siblings in the layout.
             }
         });
-        // All four stay alive. They are cheap, and the service switch, the call log and
-        // the vehicle readings are refreshed by the tick whether or not their page is on screen.
-        pager.setOffscreenPageLimit(4);
+        // All of them stay alive. They are cheap, and the service switch, the call log, the
+        // window-close status and the vehicle readings are refreshed by the tick whether or
+        // not their page is on screen — refreshWindowClose in particular dereferences views
+        // the pager would otherwise be free to detach.
+        pager.setOffscreenPageLimit(panes.length - 1);
         pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override public void onPageSelected(int position) { markCurrentPage(position); }
         });
@@ -210,9 +214,10 @@ public class MainActivity extends AppCompatActivity {
         abrpPane    = inflatePane(R.layout.pane_abrp);
         servicePane = inflatePane(R.layout.pane_service);
         vehiclePane   = inflatePane(R.layout.pane_vehicle);
+        windowsPane = inflatePane(R.layout.pane_windows);
         wifiPane    = inflatePane(R.layout.pane_wifi);
         logPane     = inflatePane(R.layout.pane_log);
-        panes = new View[] { abrpPane, servicePane, vehiclePane, wifiPane, logPane };
+        panes = new View[] { abrpPane, servicePane, vehiclePane, windowsPane, wifiPane, logPane };
 
         bindVehiclePane();
         bindWifiPane();
@@ -326,9 +331,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void bindWindowClose() {
-        windowCloseSwitch = servicePane.findViewById(R.id.window_close_switch);
-        windowCloseStatus = servicePane.findViewById(R.id.window_close_status);
-        windowCloseLog = servicePane.findViewById(R.id.window_close_log);
+        windowCloseSwitch = windowsPane.findViewById(R.id.window_close_switch);
+        windowCloseStatus = windowsPane.findViewById(R.id.window_close_status);
+        windowCloseLog = windowsPane.findViewById(R.id.window_close_log);
         windowCloseListener = (button, enabled) -> {
             prefs.edit().putBoolean(WindowCloseService.KEY_ENABLED, enabled).apply();
             if (enabled) WindowCloseService.startIfEnabled(this);
