@@ -4,6 +4,36 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.4] - 2026-09-25
+
+### Fixed
+
+- OTA installs now go through the platform `PackageInstaller` instead of shelling out to
+  `pm install -r`. The old path handed the package manager service a file inside the app's
+  private cache, which it cannot read from its own process, and every such failure was
+  reported as `Kurulum reddedildi (imza uyuşmuyor?)` — a signature verdict on a correctly
+  signed build. A session streams the archive from this process, so no second process has
+  to reach our cache. Approach taken from merthankaraman/DriveHub_Dort, which solved the
+  same problem on the same head unit.
+- The four ways an install can be refused no longer share one message. The certificate
+  check, an unparseable or wrong-package archive, and a failed session each say so, and the
+  package manager's own `INSTALL_FAILED_*` text is surfaced verbatim rather than guessed at.
+- The archive's package name is checked against ours. The platform key signs every app on
+  the unit, so a certificate match alone never meant the APK was this app.
+
+## [2.2.3] - 2026-09-23
+
+### Added
+
+- Opt-in SWI69 Comfort window closing adapted from WinClose, independent of ABRP.
+  Door opening while in P at readable 0 km/h closes all four windows with a bounded
+  five-second pulse; STOP is attempted on completion, cancellation and failure.
+  No driving timer, speed threshold, delay or per-window settings. A wake lock is held
+  across the pulse, and WinClose's 60-second cooldown suppresses a second close when the
+  door is reopened. The state a fresh listener registration replays seeds the door edge
+  detector instead of triggering it. The service stops itself on a non-SWI69 generation
+  or without system uid. Not tested on a car.
+
 ## [2.2.2] - 2026-09-17
 
 ### Changed
