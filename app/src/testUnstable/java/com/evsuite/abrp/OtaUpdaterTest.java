@@ -122,6 +122,28 @@ public class OtaUpdaterTest {
     }
 
     @Test
+    public void sha256SidecarFormatsAreParsed() {
+        String hash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        assertEquals(hash, OtaUpdater.parseExpectedSha256(hash,
+                "FatihsMG4-unstable-2.2.7.apk"));
+        assertEquals(hash, OtaUpdater.parseExpectedSha256(
+                hash + "  *FatihsMG4-unstable-2.2.7.apk\n",
+                "FatihsMG4-unstable-2.2.7.apk"));
+        assertNull(OtaUpdater.parseExpectedSha256(hash + "  another.apk",
+                "FatihsMG4-unstable-2.2.7.apk"));
+        assertNull(OtaUpdater.parseExpectedSha256("not-a-hash",
+                "FatihsMG4-unstable-2.2.7.apk"));
+    }
+
+    @Test
+    public void updateWithoutHashSidecarIsReportedButCannotBeVerified() throws Exception {
+        JSONArray releases = new JSONArray().put(releaseWithoutHashes(true, asset("2.2.7")));
+        OtaUpdater.Update update = OtaUpdater.selectUpdate(releases, "2.2.6.0-unstable");
+        assertEquals("2.2.7", update.versionName);
+        assertNull(update.hashUrl);
+    }
+
+    @Test
     public void newestAssetWinsEvenWhenItIsLaterInTheSameRelease() throws Exception {
         JSONArray releases = new JSONArray().put(release(true,
                 asset("2.2.3"), asset("2.2.6"), asset("2.2.4")))
@@ -200,6 +222,22 @@ public class OtaUpdaterTest {
     }
 
     private static JSONObject release(boolean prerelease, JSONObject... assets) throws Exception {
+        JSONArray list = new JSONArray();
+        for (JSONObject asset : assets) {
+            list.put(asset);
+            String name = asset.optString("name", "");
+            if (name.toLowerCase(java.util.Locale.US).endsWith(".apk")) {
+                list.put(new JSONObject()
+                        .put("name", name + ".sha256")
+                        .put("browser_download_url",
+                                asset.optString("browser_download_url") + ".sha256"));
+            }
+        }
+        return new JSONObject().put("prerelease", prerelease).put("assets", list);
+    }
+
+    private static JSONObject releaseWithoutHashes(boolean prerelease, JSONObject... assets)
+            throws Exception {
         JSONArray list = new JSONArray();
         for (JSONObject asset : assets) list.put(asset);
         return new JSONObject().put("prerelease", prerelease).put("assets", list);

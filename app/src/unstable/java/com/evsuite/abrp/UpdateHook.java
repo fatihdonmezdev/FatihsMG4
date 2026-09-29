@@ -35,12 +35,27 @@ final class UpdateHook {
 
     /** Result of one check, for the UI to report. */
     interface Listener {
+        default void onProgress(int percent) { }
         void onResult(String message);
     }
 
-    /** Fire-and-forget check on app start. Nothing is reported; failures stay in the log. */
+    /** Startup only checks and notifies. Download/install remains an explicit driver action. */
     static void checkInBackground(Context context) {
-        checkInBackground(context, null);
+        Context app = context.getApplicationContext();
+        new Thread(() -> {
+            try {
+                String current = app.getPackageManager()
+                        .getPackageInfo(app.getPackageName(), 0).versionName;
+                OtaUpdater.Update update = OtaUpdater.check(current);
+                if (update != null && update.hashUrl != null)
+                    new android.os.Handler(android.os.Looper.getMainLooper())
+                            .post(() -> android.widget.Toast.makeText(app,
+                                "Güncelleme hazır: " + update.versionName,
+                                android.widget.Toast.LENGTH_LONG).show());
+            } catch (Throwable t) {
+                Log.w(TAG, "Startup update check failed", t);
+            }
+        }, "ota-startup-check").start();
     }
 
     /**
@@ -60,7 +75,7 @@ final class UpdateHook {
         new Thread(() -> {
             String message;
             try {
-                message = runCheck(app);
+                message = runCheck(app, listener, main);
             } catch (Throwable t) {
                 Log.w(TAG, "Update check threw", t);
                 message = "Güncelleme kontrolü başarısız";
@@ -75,7 +90,8 @@ final class UpdateHook {
     }
 
     /** The blocking part. Returns a line describing what happened, for the UI. */
-    private static String runCheck(Context app) throws IOException {
+    private static String runCheck(Context app, Listener listener,
+                                   android.os.Handler main) throws IOException {
         String current;
         try {
             current = app.getPackageManager()
@@ -88,8 +104,18 @@ final class UpdateHook {
         if (update == null) return "Güncel (" + current + ")";
 
         Log.i(TAG, "Update available: " + update.versionName);
-        File apk = OtaUpdater.download(app, update);
-        if (apk == null) return "İndirme başarısız (" + update.versionName + ")";
+        String expectedHash;
+        try {
+            expectedHash = OtaUpdater.fetchExpectedSha256(update);
+        } catch (IOException e) {
+            Log.w(TAG, "OTA hash unavailable", e);
+            return "Güncelleme reddedildi: SHA-256 doğrulaması yok";
+        }
+        File apk = OtaUpdater.download(app, update, expectedHash, percent -> {
+            if (listener != null) main.post(() -> listener.onProgress(percent));
+        });
+        if (apk == null) return "İndirme veya SHA-256 doğrulaması başarısız ("
+                + update.versionName + ")";
 
         // The cached APK is cleared whichever way install goes: a rejected archive must not
         // linger, and an accepted one has already been streamed into the installer session.

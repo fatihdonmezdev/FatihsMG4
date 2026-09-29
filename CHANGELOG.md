@@ -4,6 +4,23 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.8] - 2026-09-29
+
+### Changed
+
+- Updated the check-in-progress copy for an end-to-end OTA upgrade test from 2.2.7.
+
+## [2.2.7] - 2026-09-29
+
+### Changed
+
+- OTA updates now require an APK-specific `.sha256` asset or matching `SHA256SUMS` entry,
+  adapted from DriveHub_Dort commit `3b043875`. Downloaded bytes are hashed while streaming
+  and rejected before PackageInstaller if integrity does not match.
+- Startup performs a quiet availability check and never downloads by itself. Manual updates
+  show download progress and a final result dialog.
+- Existing exact-host, same-certificate and same-package checks remain mandatory.
+
 ## [2.2.6] - 2026-09-29
 
 ### Changed

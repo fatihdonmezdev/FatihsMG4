@@ -112,7 +112,10 @@
     <string name="ota_install_success">Güncelleme kuruldu — uygulamayı yeniden başlatın</string>
     <string name="ota_install_failed">Kurulum başarısız: %1$s</string>
     <string name="update_check">Güncelleme kontrol et</string>
-    <string name="update_checking">Kontrol ediliyor…</string>
+    <string name="update_checking">Yeni sürüm kontrol ediliyor…</string>
+    <string name="update_dialog_title">Yazılım güncellemesi</string>
+    <string name="update_downloading">İndiriliyor ve doğrulanıyor…</string>
+    <string name="update_downloading_percent">İndiriliyor… %1$d%%</string>
     <string name="about_action">About</string>
     <string name="about_title">Fatih\'sMG4 Hakkında</string>
     <string name="about_version">Version %1$s</string>

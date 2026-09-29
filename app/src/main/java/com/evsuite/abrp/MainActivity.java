@@ -658,17 +658,56 @@ public class MainActivity extends AppCompatActivity {
      * a second press would start a second download of the same APK. It comes back on when
      * the result lands, whatever that result is.
      *
-     * The outcome goes to a toast because there is nowhere better: the check is reachable
-     * from every page, so no one page owns the answer.
+     * A modal progress surface keeps the driver informed while the APK is downloaded and
+     * SHA-256 verified; the final result remains visible until dismissed.
      */
     private void checkForUpdate(View button) {
         button.setEnabled(false);
-        android.widget.Toast.makeText(this, R.string.update_checking,
-                android.widget.Toast.LENGTH_SHORT).show();
-        UpdateHook.checkInBackground(this, message -> {
-            button.setEnabled(true);
-            android.widget.Toast.makeText(this, message,
-                    android.widget.Toast.LENGTH_LONG).show();
+        android.widget.LinearLayout panel = new android.widget.LinearLayout(this);
+        panel.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int padding = (int) (24 * getResources().getDisplayMetrics().density);
+        panel.setPadding(padding, padding, padding, padding);
+        TextView status = new TextView(this);
+        status.setText(R.string.update_checking);
+        status.setTextAppearance(R.style.Text_EV_Body);
+        android.widget.ProgressBar progress = new android.widget.ProgressBar(this, null,
+                android.R.attr.progressBarStyleHorizontal);
+        progress.setIndeterminate(true);
+        android.widget.LinearLayout.LayoutParams progressParams =
+                new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        progressParams.topMargin = padding;
+        panel.addView(status);
+        panel.addView(progress, progressParams);
+        androidx.appcompat.app.AlertDialog dialog = new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.update_dialog_title)
+                .setView(panel)
+                .setCancelable(false)
+                .create();
+        dialog.show();
+        UpdateHook.checkInBackground(this, new UpdateHook.Listener() {
+            @Override public void onProgress(int percent) {
+                if (percent < 0) {
+                    progress.setIndeterminate(true);
+                    status.setText(R.string.update_downloading);
+                } else {
+                    progress.setIndeterminate(false);
+                    progress.setMax(100);
+                    progress.setProgress(percent);
+                    status.setText(getString(R.string.update_downloading_percent, percent));
+                }
+            }
+
+            @Override public void onResult(String message) {
+                button.setEnabled(true);
+                dialog.dismiss();
+                new MaterialAlertDialogBuilder(MainActivity.this)
+                        .setTitle(R.string.update_dialog_title)
+                        .setMessage(message)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show();
+            }
         });
     }
 

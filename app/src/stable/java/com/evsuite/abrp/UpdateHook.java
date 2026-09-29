@@ -18,6 +18,7 @@ final class UpdateHook {
      * Nothing implements it here.
      */
     interface Listener {
+        default void onProgress(int percent) { }
         void onResult(String message);
     }
 

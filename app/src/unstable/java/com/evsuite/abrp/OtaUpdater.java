@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.security.MessageDigest;
 
 /**
  * Over-the-air updater — UNSTABLE BUILDS ONLY.
@@ -68,6 +69,7 @@ final class OtaUpdater {
                     java.util.regex.Pattern.CASE_INSENSITIVE);
 
     private static final int TIMEOUT_MS = 10_000;
+    private static final int MAX_HASH_BYTES = 16 * 1024;
 
     private OtaUpdater() { }
 
@@ -84,11 +86,19 @@ final class OtaUpdater {
     static final class Update {
         final String versionName;
         final String apkUrl;
+        final String apkName;
+        final String hashUrl;
 
-        Update(String versionName, String apkUrl) {
+        Update(String versionName, String apkUrl, String apkName, String hashUrl) {
             this.versionName = versionName;
             this.apkUrl = apkUrl;
+            this.apkName = apkName;
+            this.hashUrl = hashUrl;
         }
+    }
+
+    interface ProgressListener {
+        void onProgress(int percent);
     }
 
     /**
@@ -214,10 +224,96 @@ final class OtaUpdater {
                 if (version == null || !isNewer(version, currentVersion)) continue;
                 if (best != null && !isNewer(version, best.versionName)) continue;
                 String url = asset.optString("browser_download_url", "");
-                if (isAllowedUrl(url)) best = new Update(version, url);
+                String hashUrl = findHashUrl(assets, name);
+                // Keep the candidate even when the sidecar is absent so the UI can report
+                // a broken release instead of incorrectly saying the app is current.
+                // fetchExpectedSha256 still fails closed before any APK is downloaded.
+                if (isAllowedUrl(url)) best = new Update(version, url, name, hashUrl);
             }
         }
         return best;
+    }
+
+    private static String findHashUrl(JSONArray assets, String apkName) throws JSONException {
+        String exact = apkName + ".sha256";
+        String sums = null;
+        for (int i = 0; i < assets.length(); i++) {
+            JSONObject asset = assets.getJSONObject(i);
+            String name = asset.optString("name", "");
+            String url = asset.optString("browser_download_url", "");
+            if (!isAllowedUrl(url)) continue;
+            if (exact.equalsIgnoreCase(name)) return url;
+            if ("SHA256SUMS".equalsIgnoreCase(name)) sums = url;
+        }
+        return sums;
+    }
+
+    static String parseExpectedSha256(String content, String apkName) {
+        if (content == null || apkName == null) return null;
+        for (String raw : content.split("\\r?\\n")) {
+            String line = raw.trim();
+            if (line.isEmpty()) continue;
+            String[] fields = line.split("\\s+");
+            if (fields.length == 1 && isSha256(fields[0]))
+                return fields[0].toLowerCase(Locale.US);
+            if (fields.length >= 2 && isSha256(fields[0])) {
+                String named = fields[fields.length - 1].replaceFirst("^\\*", "");
+                if (apkName.equals(named)) return fields[0].toLowerCase(Locale.US);
+            }
+        }
+        return null;
+    }
+
+    private static boolean isSha256(String value) {
+        return value != null && value.matches("(?i)[a-f0-9]{64}");
+    }
+
+    static String fetchExpectedSha256(Update update) throws IOException {
+        if (update == null || !isAllowedUrl(update.hashUrl))
+            throw new IOException("Missing SHA-256 sidecar");
+        String body = readSmallText(update.hashUrl);
+        String hash = parseExpectedSha256(body, update.apkName);
+        if (hash == null) throw new IOException("Invalid SHA-256 sidecar");
+        return hash;
+    }
+
+    private static String readSmallText(String initialUrl) throws IOException {
+        URL current = new URL(initialUrl);
+        for (int redirects = 0; redirects <= 5; redirects++) {
+            if (!isAllowedUrl(current.toString())) throw new IOException("Hash URL refused");
+            HttpURLConnection connection = (HttpURLConnection) current.openConnection();
+            connection.setInstanceFollowRedirects(false);
+            connection.setConnectTimeout(TIMEOUT_MS);
+            connection.setReadTimeout(TIMEOUT_MS);
+            connection.setRequestProperty("User-Agent", "EVABRPUploader-Android");
+            try {
+                int status = connection.getResponseCode();
+                if (status >= 300 && status <= 399) {
+                    String location = connection.getHeaderField("Location");
+                    if (location == null) throw new IOException("Hash redirect missing location");
+                    current = current.toURI().resolve(location).toURL();
+                    continue;
+                }
+                if (status != HttpURLConnection.HTTP_OK)
+                    throw new IOException("Hash download returned " + status);
+                StringBuilder body = new StringBuilder();
+                try (java.io.InputStream in = connection.getInputStream()) {
+                    byte[] buffer = new byte[1024];
+                    int count;
+                    while ((count = in.read(buffer)) != -1) {
+                        if (body.length() + count > MAX_HASH_BYTES)
+                            throw new IOException("Hash response too large");
+                        body.append(new String(buffer, 0, count, StandardCharsets.UTF_8));
+                    }
+                }
+                return body.toString();
+            } catch (java.net.URISyntaxException e) {
+                throw new IOException("Invalid hash redirect", e);
+            } finally {
+                connection.disconnect();
+            }
+        }
+        throw new IOException("Too many hash redirects");
     }
 
     /**
@@ -235,7 +331,8 @@ final class OtaUpdater {
     /**
      * Downloads into private cache. Every redirect URL is validated before it is followed.
      */
-    static File download(Context context, Update update) {
+    static File download(Context context, Update update, String expectedSha256,
+                         ProgressListener listener) {
         if (!isAllowedUrl(update.apkUrl)) {
             Log.w(TAG, "Refusing to download from " + update.apkUrl);
             return null;
@@ -262,13 +359,31 @@ final class OtaUpdater {
                         continue;
                     }
                     if (status != HttpURLConnection.HTTP_OK) return null;
+                    MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                    long total = connection.getContentLengthLong();
+                    long received = 0;
+                    int lastPercent = -1;
                     try (FileOutputStream output = new FileOutputStream(temporary)) {
                         try (java.io.InputStream input = connection.getInputStream()) {
                             byte[] buffer = new byte[32 * 1024];
                             int count;
-                            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                            while ((count = input.read(buffer)) != -1) {
+                                output.write(buffer, 0, count);
+                                digest.update(buffer, 0, count);
+                                received += count;
+                                int percent = total > 0 ? (int) Math.min(100, received * 100 / total) : -1;
+                                if (listener != null && percent != lastPercent) {
+                                    listener.onProgress(percent);
+                                    lastPercent = percent;
+                                }
+                            }
                         }
                         output.getFD().sync();
+                    }
+                    String actual = hex(digest.digest());
+                    if (!actual.equalsIgnoreCase(expectedSha256)) {
+                        Log.w(TAG, "Downloaded APK SHA-256 mismatch");
+                        return null;
                     }
                     if (!temporary.renameTo(target)) return null;
                     return target;
@@ -282,6 +397,12 @@ final class OtaUpdater {
             if (temporary != null && temporary.exists()) temporary.delete();
         }
         return null;
+    }
+
+    private static String hex(byte[] bytes) {
+        StringBuilder out = new StringBuilder(bytes.length * 2);
+        for (byte value : bytes) out.append(String.format(Locale.US, "%02x", value));
+        return out.toString();
     }
 
     /**
