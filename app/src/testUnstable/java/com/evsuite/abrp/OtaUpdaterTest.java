@@ -7,6 +7,16 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 
 /**
  * OTA update policy — unstable channel only. The updater installs code on a vehicle, so the
@@ -109,6 +119,109 @@ public class OtaUpdaterTest {
         assertArrayEquals(new int[]{1, 2, 3}, OtaUpdater.segments("1.2.3+build7"));
         // A non-numeric segment is 0, not dropped.
         assertArrayEquals(new int[]{1, 0, 5}, OtaUpdater.segments("1.x.5"));
+    }
+
+    @Test
+    public void newestAssetWinsEvenWhenItIsLaterInTheSameRelease() throws Exception {
+        JSONArray releases = new JSONArray().put(release(true,
+                asset("2.2.3"), asset("2.2.6"), asset("2.2.4")))
+                .put(release(true, asset("2.2.5")));
+        OtaUpdater.Update update = OtaUpdater.selectUpdate(releases, "2.2.2.0-unstable");
+        assertEquals("2.2.6", update.versionName);
+        assertTrue(update.apkUrl.endsWith("FatihsMG4-unstable-2.2.6.apk"));
+    }
+
+    @Test
+    public void stableDraftForeignAndUnversionedAssetsCannotWin() throws Exception {
+        JSONObject foreign = asset("9.0.0").put("browser_download_url", "https://example.com/app.apk");
+        JSONObject unversioned = asset("9.0.0").put("name", "FatihsMG4-unstable.apk");
+        JSONObject stableName = asset("9.0.0").put("name", "FatihsMG4-stable-9.0.0.apk");
+        JSONArray releases = new JSONArray()
+                .put(release(false, asset("9.0.0")))
+                .put(release(true, asset("9.0.0")).put("draft", true))
+                .put(release(true, foreign, unversioned, stableName, asset("2.2.5")));
+        assertEquals("2.2.5", OtaUpdater.selectUpdate(releases, "2.2.4.0-unstable").versionName);
+    }
+
+    @Test
+    public void successfulCheckFindsUpdateAndDisconnects() throws Exception {
+        Response response = new Response(200,
+                new JSONArray().put(release(true, asset("2.2.5"))).toString());
+        assertEquals("2.2.5", OtaUpdater.check("2.2.4.0-unstable", response).versionName);
+        assertTrue(response.disconnected);
+    }
+
+    @Test
+    public void successfulCheckWithOnlyOlderOrEqualVersionsIsCurrent() throws Exception {
+        Response response = new Response(200,
+                new JSONArray().put(release(true, asset("2.2.3"), asset("2.2.5"))).toString());
+        assertNull(OtaUpdater.check("2.2.5.0-unstable", response));
+        assertTrue(response.disconnected);
+    }
+
+    @Test(expected = IOException.class)
+    public void rateLimitMustNotBeReportedAsCurrent() throws Exception {
+        Response response = new Response(403, "{}");
+        try {
+            OtaUpdater.check("2.2.4.0-unstable", response);
+        } finally {
+            assertTrue(response.disconnected);
+        }
+    }
+
+    @Test(expected = IOException.class)
+    public void malformedResponseMustNotBeReportedAsCurrent() throws Exception {
+        Response response = new Response(200, "<html>unavailable</html>");
+        try {
+            OtaUpdater.check("2.2.4.0-unstable", response);
+        } finally {
+            assertTrue(response.disconnected);
+        }
+    }
+
+    @Test(expected = SocketTimeoutException.class)
+    public void timeoutMustNotBeReportedAsCurrent() throws Exception {
+        Response response = new Response(200, "[]") {
+            @Override public InputStream getInputStream() throws IOException {
+                throw new SocketTimeoutException("test timeout");
+            }
+        };
+        try {
+            OtaUpdater.check("2.2.4.0-unstable", response);
+        } finally {
+            assertTrue(response.disconnected);
+        }
+    }
+
+    private static JSONObject asset(String version) throws Exception {
+        String name = "FatihsMG4-unstable-" + version + ".apk";
+        return new JSONObject().put("name", name).put("browser_download_url",
+                "https://github.com/fatihdonmezdev/MG4ABRP/releases/download/unstable/" + name);
+    }
+
+    private static JSONObject release(boolean prerelease, JSONObject... assets) throws Exception {
+        JSONArray list = new JSONArray();
+        for (JSONObject asset : assets) list.put(asset);
+        return new JSONObject().put("prerelease", prerelease).put("assets", list);
+    }
+
+    private static class Response extends HttpURLConnection {
+        private final int status;
+        private final String body;
+        boolean disconnected;
+
+        Response(int status, String body) throws Exception {
+            super(new URL("https://api.github.com/repos/fatihdonmezdev/MG4ABRP/releases"));
+            this.status = status;
+            this.body = body;
+        }
+        @Override public int getResponseCode() { return status; }
+        @Override public InputStream getInputStream() throws IOException {
+            return new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8));
+        }
+        @Override public void disconnect() { disconnected = true; }
+        @Override public boolean usingProxy() { return false; }
+        @Override public void connect() { }
     }
 
     // The `pm install -r` exit-code test that stood here is gone with the shell-out it

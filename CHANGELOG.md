@@ -4,6 +4,36 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.6] - 2026-09-29
+
+### Changed
+
+- Redesigned all five pages with an OLED-black background, charcoal translucent panels,
+  muted gold navigation and cyan controls. Static gradients avoid continuous rendering.
+- Vehicle overview is now the first page. Energy, temperatures and tyre pressures appear
+  at the top, with compact battery, range, power, speed and energy cards below.
+  Unknown data stays a dash.
+- Added a wide-screen navigation rail and paired cards, with stacked pages and bottom
+  navigation for narrower windows. Headers follow the selected page.
+- Restyled credentials, transfer controls, frequency picker, Wi-Fi, logs and About;
+  the interface stays dark regardless of the system theme.
+
+## [2.2.5] - 2026-09-29
+
+### Removed
+
+- Window closing: its page, service, door listener, pulse logic, resources and dedicated
+  permissions are removed. Previous opt-in preferences cannot restart the removed service.
+
+### Fixed
+
+- OTA checks now report API, network and response errors instead of saying the app is current.
+- Release selection considers every asset, choosing the newest eligible version even when
+  it appears later in the same release. Drafts and stable releases are excluded.
+- Concurrent launch/button update checks no longer start duplicate downloads. Installer
+  session handles are closed after commit; failed sessions are abandoned.
+- Wi-Fi permission refusals are handled explicitly, satisfying the Android lint checks.
+
 ## [2.2.4] - 2026-09-25
 
 ### Fixed

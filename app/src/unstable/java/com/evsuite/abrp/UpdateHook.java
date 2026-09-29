@@ -4,6 +4,8 @@ import android.content.Context;
 import android.util.Log;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Drives {@link OtaUpdater} — UNSTABLE BUILDS ONLY.
@@ -25,6 +27,7 @@ import java.io.File;
 final class UpdateHook {
 
     private static final String TAG = "EVABRP.Update";
+    private static final AtomicBoolean checking = new AtomicBoolean();
 
     private UpdateHook() { }
 
@@ -44,12 +47,16 @@ final class UpdateHook {
      * Checks, downloads and installs in one background pass.
      *
      * The whole sequence runs off the main thread because every step blocks: the release
-     * API call, the download, and {@code pm install}. [listener] is called back on the main
+     * API call, the download, and installer staging. [listener] is called back on the main
      * thread, so a UI caller can write straight to a view.
      */
     static void checkInBackground(Context context, Listener listener) {
         Context app = context.getApplicationContext();
         android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
+        if (!checking.compareAndSet(false, true)) {
+            if (listener != null) main.post(() -> listener.onResult("Güncelleme kontrolü zaten sürüyor"));
+            return;
+        }
         new Thread(() -> {
             String message;
             try {
@@ -57,6 +64,8 @@ final class UpdateHook {
             } catch (Throwable t) {
                 Log.w(TAG, "Update check threw", t);
                 message = "Güncelleme kontrolü başarısız";
+            } finally {
+                checking.set(false);
             }
             if (listener != null) {
                 final String result = message;
@@ -66,7 +75,7 @@ final class UpdateHook {
     }
 
     /** The blocking part. Returns a line describing what happened, for the UI. */
-    private static String runCheck(Context app) {
+    private static String runCheck(Context app) throws IOException {
         String current;
         try {
             current = app.getPackageManager()

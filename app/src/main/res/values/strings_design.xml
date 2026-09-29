@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<resources>
+  <string name="design_battery_short">Batarya</string>
+  <string name="design_probe">VHAL Probe</string>
+  <string name="design_brand">MG&#x2074;</string>
+  <string name="design_brand_caption">Fatih&#x2019;s MG4</string>
+  <string name="design_brand_footer">ELEKTR&#x130;KLE YOLDA</string>
+  <string name="design_overview_title">S&#xFC;r&#xFC;&#x15F;e bir bak&#x131;&#x15F;.</string>
+  <string name="design_overview_subtitle">Arac&#x131;ndan gelen veriler, tek bir yerde.</string>
+  <string name="design_abrp_title">Rotana ba&#x11F;lan.</string>
+  <string name="design_abrp_subtitle">ABRP hesab&#x131;nla arac&#x131;n&#x131; bulu&#x15F;tur.</string>
+  <string name="design_service_title">Sen yola odaklan.</string>
+  <string name="design_service_subtitle">Verilerin arka planda g&#xFC;ncel kals&#x131;n.</string>
+  <string name="design_wifi_title">Ba&#x11F;lant&#x131;da kal.</string>
+  <string name="design_wifi_subtitle">Yolculu&#x11F;unun internet ba&#x11F;lant&#x131;s&#x131;.</string>
+  <string name="design_log_title">Her aktar&#x131;m, burada.</string>
+  <string name="design_log_subtitle">Son g&#xF6;nderimlerin durumu ve ayr&#x131;nt&#x131;lar&#x131;.</string>
+  <string name="design_battery">BATARYA</string>
+  <string name="design_energy">ENERJ&#x130; VE SICAKLIK</string>
+  <string name="design_tires">LAST&#x130;K BASIN&#xC7;LARI</string>
+  <string name="design_account">HESAP BA&#x11E;LANTISI</string>
+  <string name="design_private_title">Sana &#xF6;zel ba&#x11F;lant&#x131;.</string>
+  <string name="design_private_body">Token, arac&#x131;n&#x131; ABRP hesab&#x131;na ba&#x11F;lar. Bilgilerin bu cihazda &#x15F;ifreli saklan&#x131;r.</string>
+  <string name="design_no_data">Okunamayan veriler &#x2014; olarak g&#xF6;sterilir.</string>
+  <string name="design_service_controls">AKTARIM KONTROL&#xDC;</string>
+  <string name="design_service_timing">G&#xDC;NCELLEME SIKLI&#x11E;I</string>
+  <string name="design_car_desc">Lastik bas&#x131;n&#xE7;lar&#x131;n&#x131;n ara&#xE7; &#xFC;zerindeki konumlar&#x131;</string>
+</resources>

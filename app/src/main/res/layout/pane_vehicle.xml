@@ -1,173 +1,79 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    The Vehicle page: every signal this build can read from the car, in the order a
-    driver glances at them.
-
-    The rows are static views rather than a RecyclerView on purpose — the set is fixed
-    and known at build time, and MainActivity holds the value TextViews the same way it
-    holds every other widget on the other pages. A row whose signal the car does not
-    publish shows a dash, never a zero: on this vehicle a zero from an unimplemented
-    VHAL property is indistinguishable from a reading, and "0 °C" or "0 kWh" is worse
-    than an honest blank.
--->
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:fillViewport="true">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="@dimen/spacing_lg">
-
-        <!-- Live vehicle data -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="@dimen/spacing_md"
-            app:cardBackgroundColor="@color/ev_surface"
-            app:cardCornerRadius="12dp"
-            app:strokeColor="@color/ev_outline"
-            app:strokeWidth="1dp"
-            app:cardElevation="3dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="@dimen/spacing_lg">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="@dimen/spacing_md"
-                    android:text="@string/vehicle_live_data"
-                    android:textAppearance="@style/Text.EV.Title" />
-
-                <TableLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:stretchColumns="0">
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_row_soc" />
-                        <TextView android:id="@+id/vehicle_soc" style="@style/DataValue" />
-                    </TableRow>
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_row_range" />
-                        <TextView android:id="@+id/vehicle_range" style="@style/DataValue" />
-                    </TableRow>
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_row_power" />
-                        <TextView android:id="@+id/vehicle_power" style="@style/DataValue" />
-                    </TableRow>
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_row_speed" />
-                        <TextView android:id="@+id/vehicle_speed" style="@style/DataValue" />
-                    </TableRow>
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_row_odometer" />
-                        <TextView android:id="@+id/vehicle_odometer" style="@style/DataValue" />
-                    </TableRow>
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_row_charging" />
-                        <TextView android:id="@+id/vehicle_charging" style="@style/DataValue" />
-                    </TableRow>
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_row_batt_temp" />
-                        <TextView android:id="@+id/vehicle_batt_temp" style="@style/DataValue" />
-                    </TableRow>
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_row_ext_temp" />
-                        <TextView android:id="@+id/vehicle_ext_temp" style="@style/DataValue" />
-                    </TableRow>
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_row_cabin_temp" />
-                        <TextView android:id="@+id/vehicle_cabin_temp" style="@style/DataValue" />
-                    </TableRow>
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_row_hvac" />
-                        <TextView android:id="@+id/vehicle_hvac" style="@style/DataValue" />
-                    </TableRow>
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_row_capacity" />
-                        <TextView android:id="@+id/vehicle_capacity" style="@style/DataValue" />
-                    </TableRow>
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_row_soe" />
-                        <TextView android:id="@+id/vehicle_soe" style="@style/DataValue" />
-                    </TableRow>
-
-                </TableLayout>
-
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:clipToPadding="false">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="24dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:background="@drawable/bg_glass">
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/design_energy" android:textAppearance="@style/Text.EV.Eyebrow" android:layout_marginBottom="12dp" />
+            <TableLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:stretchColumns="0" android:shrinkColumns="0">
+                <TableRow style="@style/DataRow" android:minHeight="40dp" android:paddingTop="8dp" android:paddingBottom="8dp">
+                    <TextView style="@style/DataLabel" android:text="@string/vehicle_row_odometer" />
+                    <TextView android:id="@+id/vehicle_odometer" style="@style/DataValue" />
+                </TableRow>
+                <TableRow style="@style/DataRow" android:minHeight="40dp" android:paddingTop="8dp" android:paddingBottom="8dp">
+                    <TextView style="@style/DataLabel" android:text="@string/vehicle_row_capacity" />
+                    <TextView android:id="@+id/vehicle_capacity" style="@style/DataValue" />
+                </TableRow>
+                <TableRow style="@style/DataRow" android:minHeight="40dp" android:paddingTop="8dp" android:paddingBottom="8dp">
+                    <TextView style="@style/DataLabel" android:text="@string/vehicle_row_batt_temp" />
+                    <TextView android:id="@+id/vehicle_batt_temp" style="@style/DataValue" />
+                </TableRow>
+                <TableRow style="@style/DataRow" android:minHeight="40dp" android:paddingTop="8dp" android:paddingBottom="8dp">
+                    <TextView style="@style/DataLabel" android:text="@string/vehicle_row_ext_temp" />
+                    <TextView android:id="@+id/vehicle_ext_temp" style="@style/DataValue" />
+                </TableRow>
+                <TableRow style="@style/DataRow" android:minHeight="40dp" android:paddingTop="8dp" android:paddingBottom="8dp">
+                    <TextView style="@style/DataLabel" android:text="@string/vehicle_row_cabin_temp" />
+                    <TextView android:id="@+id/vehicle_cabin_temp" style="@style/DataValue" />
+                </TableRow>
+                <TableRow style="@style/DataRow" android:minHeight="40dp" android:paddingTop="8dp" android:paddingBottom="8dp">
+                    <TextView style="@style/DataLabel" android:text="@string/vehicle_row_hvac" />
+                    <TextView android:id="@+id/vehicle_hvac" style="@style/DataValue" />
+                </TableRow>
+            </TableLayout>
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:background="@drawable/bg_glass" android:layout_marginTop="16dp">
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/design_tires" android:textAppearance="@style/Text.EV.Eyebrow" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="224dp" android:orientation="horizontal" android:gravity="center_vertical">
+                <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/vehicle_tire_fl" android:textAppearance="@style/Text.EV.Secondary" android:gravity="center" />
+                    <TextView android:id="@+id/vehicle_tire_fl" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:textAppearance="@style/Text.EV.Body" android:gravity="center" android:layout_marginTop="8dp" android:textColor="@color/ev_cyan" />
+                    <Space android:layout_width="1dp" android:layout_height="44dp" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/vehicle_tire_rl" android:textAppearance="@style/Text.EV.Secondary" android:gravity="center" />
+                    <TextView android:id="@+id/vehicle_tire_rl" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:textAppearance="@style/Text.EV.Body" android:gravity="center" android:layout_marginTop="8dp" android:textColor="@color/ev_cyan" />
+                </LinearLayout>
+                <ImageView android:layout_width="92dp" android:layout_height="180dp" android:src="@drawable/ic_vehicle_outline" android:contentDescription="@string/design_car_desc" />
+                <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/vehicle_tire_fr" android:textAppearance="@style/Text.EV.Secondary" android:gravity="center" />
+                    <TextView android:id="@+id/vehicle_tire_fr" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:textAppearance="@style/Text.EV.Body" android:gravity="center" android:layout_marginTop="8dp" android:textColor="@color/ev_cyan" />
+                    <Space android:layout_width="1dp" android:layout_height="44dp" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/vehicle_tire_rr" android:textAppearance="@style/Text.EV.Secondary" android:gravity="center" />
+                    <TextView android:id="@+id/vehicle_tire_rr" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:textAppearance="@style/Text.EV.Body" android:gravity="center" android:layout_marginTop="8dp" android:textColor="@color/ev_cyan" />
+                </LinearLayout>
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Tyre pressures -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/ev_surface"
-            app:cardCornerRadius="12dp"
-            app:strokeColor="@color/ev_outline"
-            app:strokeWidth="1dp"
-            app:cardElevation="3dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="@dimen/spacing_lg">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="@dimen/spacing_md"
-                    android:text="@string/vehicle_tires"
-                    android:textAppearance="@style/Text.EV.Title" />
-
-                <TableLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:stretchColumns="0">
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_tire_fl" />
-                        <TextView android:id="@+id/vehicle_tire_fl" style="@style/DataValue" />
-                    </TableRow>
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_tire_fr" />
-                        <TextView android:id="@+id/vehicle_tire_fr" style="@style/DataValue" />
-                    </TableRow>
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_tire_rl" />
-                        <TextView android:id="@+id/vehicle_tire_rl" style="@style/DataValue" />
-                    </TableRow>
-
-                    <TableRow style="@style/DataRow">
-                        <TextView style="@style/DataLabel" android:text="@string/vehicle_tire_rr" />
-                        <TextView android:id="@+id/vehicle_tire_rr" style="@style/DataValue" />
-                    </TableRow>
-
-                </TableLayout>
-
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/design_no_data" android:textAppearance="@style/Text.EV.Secondary" />
+        </LinearLayout>
+        <Space android:layout_width="1dp" android:layout_height="16dp" />
+        <GridLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:columnCount="2">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:minHeight="112dp" android:padding="16dp" android:background="@drawable/bg_battery_card" android:layout_columnWeight="1" android:layout_margin="4dp">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/design_battery_short" android:textAppearance="@style/Text.EV.Secondary" />
+                <TextView android:id="@+id/vehicle_soc" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:layout_marginTop="6dp" android:textAppearance="@style/Text.EV.Metric.Compact" android:maxLines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="18sp" android:autoSizeMaxTextSize="28sp" android:autoSizeStepGranularity="1sp" />
+                <TextView android:id="@+id/vehicle_charging" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:textAppearance="@style/Text.EV.Secondary" android:textColor="@color/ev_cyan" android:textSize="16sp" android:maxLines="1" android:ellipsize="end" />
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:minHeight="112dp" android:padding="16dp" android:background="@drawable/bg_glass" android:layout_columnWeight="1" android:layout_margin="4dp">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/vehicle_row_range" android:textAppearance="@style/Text.EV.Secondary" />
+                <TextView android:id="@+id/vehicle_range" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:layout_marginTop="6dp" android:textAppearance="@style/Text.EV.Metric.Compact" android:maxLines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="18sp" android:autoSizeMaxTextSize="28sp" android:autoSizeStepGranularity="1sp" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:minHeight="112dp" android:padding="16dp" android:background="@drawable/bg_glass" android:layout_columnWeight="1" android:layout_margin="4dp">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/vehicle_row_power" android:textAppearance="@style/Text.EV.Secondary" />
+                <TextView android:id="@+id/vehicle_power" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:layout_marginTop="6dp" android:textAppearance="@style/Text.EV.Metric.Compact" android:maxLines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="18sp" android:autoSizeMaxTextSize="28sp" android:autoSizeStepGranularity="1sp" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:minHeight="112dp" android:padding="16dp" android:background="@drawable/bg_glass" android:layout_columnWeight="1" android:layout_margin="4dp">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/vehicle_row_speed" android:textAppearance="@style/Text.EV.Secondary" />
+                <TextView android:id="@+id/vehicle_speed" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:layout_marginTop="6dp" android:textAppearance="@style/Text.EV.Metric.Compact" android:maxLines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="18sp" android:autoSizeMaxTextSize="28sp" android:autoSizeStepGranularity="1sp" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:minHeight="112dp" android:padding="16dp" android:background="@drawable/bg_glass" android:layout_columnWeight="1" android:layout_margin="4dp" android:layout_columnSpan="2">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/vehicle_row_soe" android:textAppearance="@style/Text.EV.Secondary" />
+                <TextView android:id="@+id/vehicle_soe" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="—" android:layout_marginTop="6dp" android:textAppearance="@style/Text.EV.Metric.Compact" android:maxLines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="18sp" android:autoSizeMaxTextSize="28sp" android:autoSizeStepGranularity="1sp" />
+            </LinearLayout>
+        </GridLayout>
     </LinearLayout>
 </ScrollView>

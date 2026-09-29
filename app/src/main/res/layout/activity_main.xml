@@ -1,135 +1,22 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
-    A fixed top bar above a single ViewPager2, same shape as EVProfile and EVTasker.
-
-    The three screens — ABRP, Service, Log — are the pages of that one pager, in the
-    order the bar lists them. Each button goes to its page and a horizontal swipe walks
-    through them all: the gesture and the button name the same thing. The pages
-    themselves live in pane_abrp.xml / pane_service.xml / pane_log.xml, because a
-    ViewPager2 takes its children from an adapter rather than from this file.
-
-    Button navigation rather than Material tabs: on a vehicle screen, always-visible
-    64 dp targets beat a thin tab bar. The tabs share the width left by the title and
-    the About button equally (weight 1), so the row can be aimed at from memory whatever
-    the translated labels are.
-
-    No MaterialButtonToggleGroup: the group owns a checked state of its own, which would
-    fight the pager for who decides the current screen. Here the pager decides alone and
-    MainActivity.markCurrentPage posts isSelected — the fill, text, icon and stroke come
-    from the res/color/nav_tab_*.xml selectors.
--->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/ev_background">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="80dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:baselineAligned="false"
-        android:paddingStart="@dimen/spacing_md"
-        android:paddingEnd="@dimen/spacing_md"
-        android:background="@drawable/bg_topbar">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/app_name"
-            android:textAppearance="@style/Text.EV.Title"
-            android:layout_marginEnd="@dimen/spacing_lg" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/tabAbrp"
-            style="@style/Widget.EV.NavTab"
-            android:layout_width="0dp"
-            android:layout_height="64dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="@dimen/spacing_sm"
-            android:text="@string/tab_abrp"
-            app:icon="@drawable/ic_tab_abrp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/tabService"
-            style="@style/Widget.EV.NavTab"
-            android:layout_width="0dp"
-            android:layout_height="64dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="@dimen/spacing_sm"
-            android:text="@string/tab_service"
-            app:icon="@drawable/ic_tab_service" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/tabVehicle"
-            style="@style/Widget.EV.NavTab"
-            android:layout_width="0dp"
-            android:layout_height="64dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="@dimen/spacing_sm"
-            android:text="@string/tab_vehicle"
-            app:icon="@drawable/ic_tab_vehicle" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/tabWindows"
-            style="@style/Widget.EV.NavTab"
-            android:layout_width="0dp"
-            android:layout_height="64dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="@dimen/spacing_sm"
-            android:text="@string/tab_windows"
-            app:icon="@drawable/ic_tab_windows" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/tabWifi"
-            style="@style/Widget.EV.NavTab"
-            android:layout_width="0dp"
-            android:layout_height="64dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="@dimen/spacing_sm"
-            android:text="@string/tab_wifi"
-            app:icon="@drawable/ic_tab_wifi" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/tabLog"
-            style="@style/Widget.EV.NavTab"
-            android:layout_width="0dp"
-            android:layout_height="64dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="@dimen/spacing_lg"
-            android:text="@string/tab_log"
-            app:icon="@drawable/ic_tab_log" />
-
-        <!-- Neither of these is a destination: they stay plain buttons, outside the tab
-             row, so they cannot be mistaken for pages of the pager. -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/update_button"
-            style="@style/Widget.EV.Button.Outlined"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="@dimen/spacing_sm"
-            android:contentDescription="@string/update_check"
-            app:icon="@drawable/ic_refresh"
-            app:iconPadding="0dp"
-            android:minWidth="0dp"
-            android:paddingStart="@dimen/spacing_md"
-            android:paddingEnd="@dimen/spacing_md" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/about_button"
-            style="@style/Widget.EV.Button.Outlined"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/about_action" />
-
+<?xml version="1.0"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:id="@+id/app_root" android:layout_width="match_parent" android:layout_height="match_parent" android:fitsSystemWindows="true" android:background="@color/ev_background">
+  <com.evsuite.abrp.PremiumBackdropView android:layout_width="match_parent" android:layout_height="match_parent"/>
+  <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="24dp" android:paddingEnd="24dp" android:paddingTop="16dp" android:paddingBottom="8dp">
+      <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/design_overview_title" android:textAppearance="@style/Text.EV.Title" android:id="@+id/header_title" android:textSize="24sp"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/design_overview_subtitle" android:textAppearance="@style/Text.EV.Secondary" android:id="@+id/header_subtitle" android:layout_marginTop="6dp"/>
+      </LinearLayout>
+      <com.google.android.material.button.MaterialButton android:id="@+id/update_button" style="@style/Widget.EV.Button.Outlined" android:layout_width="72dp" android:layout_height="72dp" android:minWidth="0dp" android:padding="0dp" android:contentDescription="@string/update_check" app:icon="@drawable/ic_refresh" app:iconGravity="textStart" app:iconPadding="0dp" app:iconTint="@color/ev_accent"/>
+      <com.google.android.material.button.MaterialButton android:id="@+id/about_button" style="@style/Widget.EV.Button.Outlined" android:layout_width="72dp" android:layout_height="72dp" android:layout_marginStart="8dp" android:minWidth="0dp" android:padding="0dp" android:contentDescription="@string/about_action" app:icon="@drawable/ic_info" app:iconGravity="textStart" app:iconPadding="0dp"/>
     </LinearLayout>
-
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/content"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
-</LinearLayout>
+    <androidx.viewpager2.widget.ViewPager2 android:id="@+id/content" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:padding="8dp" android:background="@drawable/bg_sidebar">
+      <com.google.android.material.button.MaterialButton android:id="@+id/tabVehicle" style="@style/Widget.EV.NavTab.Compact" android:layout_width="0dp" android:layout_height="76dp" android:layout_weight="1" android:text="@string/tab_vehicle" app:icon="@drawable/ic_tab_vehicle"/>
+      <com.google.android.material.button.MaterialButton android:id="@+id/tabAbrp" style="@style/Widget.EV.NavTab.Compact" android:layout_width="0dp" android:layout_height="76dp" android:layout_weight="1" android:text="@string/tab_abrp" app:icon="@drawable/ic_tab_abrp"/>
+      <com.google.android.material.button.MaterialButton android:id="@+id/tabService" style="@style/Widget.EV.NavTab.Compact" android:layout_width="0dp" android:layout_height="76dp" android:layout_weight="1" android:text="@string/tab_service" app:icon="@drawable/ic_tab_service"/>
+      <com.google.android.material.button.MaterialButton android:id="@+id/tabWifi" style="@style/Widget.EV.NavTab.Compact" android:layout_width="0dp" android:layout_height="76dp" android:layout_weight="1" android:text="@string/tab_wifi" app:icon="@drawable/ic_tab_wifi"/>
+      <com.google.android.material.button.MaterialButton android:id="@+id/tabLog" style="@style/Widget.EV.NavTab.Compact" android:layout_width="0dp" android:layout_height="76dp" android:layout_weight="1" android:text="@string/tab_log" app:icon="@drawable/ic_tab_log"/>
+    </LinearLayout>
+  </LinearLayout>
+</FrameLayout>

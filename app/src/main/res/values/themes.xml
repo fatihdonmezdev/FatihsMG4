@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- DayNight, not a forced dark theme: the suite follows the vehicle's day/night
-         setting. Dark is still the mode that matters - a light background filling the
-         windscreen at night is glare - which is why the light palette was raised to
-         the same 7:1 floor as the dark one rather than the other way round.
-         Shared component styles live in styles_ev.xml. -->
+    <!-- User-requested OLED theme. MainActivity fixes night mode for system widgets too. -->
     <style name="Theme.EVABRPUploader" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/ev_accent</item>
+        <item name="colorSecondary">@color/ev_cyan</item>
+        <item name="colorControlActivated">@color/ev_cyan</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:navigationBarColor">@color/ev_background</item>
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
         <item name="colorOnPrimary">@color/ev_on_accent</item>
         <item name="colorSurface">@color/ev_surface</item>
         <item name="colorSurfaceContainer">@color/ev_surface_raised</item>

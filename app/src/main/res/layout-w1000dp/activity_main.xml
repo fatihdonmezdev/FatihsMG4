@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:id="@+id/app_root" android:layout_width="match_parent" android:layout_height="match_parent" android:fitsSystemWindows="true" android:background="@color/ev_background">
+    <com.evsuite.abrp.PremiumBackdropView android:layout_width="match_parent" android:layout_height="match_parent" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal">
+        <ScrollView android:layout_width="192dp" android:layout_height="match_parent" android:layout_margin="16dp" android:fillViewport="true" android:background="@drawable/bg_sidebar" android:scrollbars="none">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="12dp">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/design_brand" android:textAppearance="@style/Text.EV.Hero" android:textColor="@color/ev_accent" android:paddingStart="14dp" android:paddingTop="8dp" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/design_brand_caption" android:textAppearance="@style/Text.EV.Secondary" android:paddingStart="14dp" android:layout_marginBottom="24dp" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/tabVehicle" style="@style/Widget.EV.NavTab" android:layout_width="match_parent" android:layout_height="64dp" android:layout_marginBottom="6dp" android:text="@string/tab_vehicle" app:icon="@drawable/ic_tab_vehicle" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/tabAbrp" style="@style/Widget.EV.NavTab" android:layout_width="match_parent" android:layout_height="64dp" android:layout_marginBottom="6dp" android:text="@string/tab_abrp" app:icon="@drawable/ic_tab_abrp" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/tabService" style="@style/Widget.EV.NavTab" android:layout_width="match_parent" android:layout_height="64dp" android:layout_marginBottom="6dp" android:text="@string/tab_service" app:icon="@drawable/ic_tab_service" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/tabWifi" style="@style/Widget.EV.NavTab" android:layout_width="match_parent" android:layout_height="64dp" android:layout_marginBottom="6dp" android:text="@string/tab_wifi" app:icon="@drawable/ic_tab_wifi" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/tabLog" style="@style/Widget.EV.NavTab" android:layout_width="match_parent" android:layout_height="64dp" android:layout_marginBottom="6dp" android:text="@string/tab_log" app:icon="@drawable/ic_tab_log" />
+            </LinearLayout>
+        </ScrollView>
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:orientation="vertical">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="24dp" android:paddingEnd="24dp" android:paddingTop="16dp" android:paddingBottom="8dp">
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/design_overview_title" android:textAppearance="@style/Text.EV.Title" android:id="@+id/header_title" android:textSize="32sp" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/design_overview_subtitle" android:textAppearance="@style/Text.EV.Secondary" android:id="@+id/header_subtitle" android:layout_marginTop="6dp" />
+                </LinearLayout>
+                <com.google.android.material.button.MaterialButton android:id="@+id/update_button" style="@style/Widget.EV.Button.Outlined" android:layout_width="72dp" android:layout_height="72dp" android:minWidth="0dp" android:padding="0dp" android:contentDescription="@string/update_check" app:icon="@drawable/ic_refresh" app:iconGravity="textStart" app:iconPadding="0dp" app:iconTint="@color/ev_accent" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/about_button" style="@style/Widget.EV.Button.Outlined" android:layout_width="72dp" android:layout_height="72dp" android:layout_marginStart="8dp" android:minWidth="0dp" android:padding="0dp" android:contentDescription="@string/about_action" app:icon="@drawable/ic_info" app:iconGravity="textStart" app:iconPadding="0dp" />
+            </LinearLayout>
+            <androidx.viewpager2.widget.ViewPager2 android:id="@+id/content" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

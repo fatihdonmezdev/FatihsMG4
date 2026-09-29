@@ -5,6 +5,15 @@ Context for AI agents and new contributors working in this repository.
 EVABRPUploader is part of **EVSuite**. The workspace `AGENTS.md` and normative
 workspace `DESIGN.md` apply; this file contains only telemetry-specific additions.
 
+## App-specific visual direction (2.2.6)
+
+The user explicitly requested a permanent OLED-black theme, charcoal glass-like cards,
+muted gold and cyan accents. These app resources intentionally override the shared
+DESIGN.md palette, DayNight preference and flat-surface rules. Do not overwrite them
+with the shared token generator. Use static gradients rather than continuous effects;
+keep large touch targets, readable text and null telemetry shown as a dash.
+Wide layouts start at 1000dp; narrower windows use a bottom navigation bar.
+
 ## What this is
 
 An Android Automotive app for the **MG4 (SAIC eh32)** that reads vehicle telemetry and
@@ -15,11 +24,8 @@ Fork of Leon Kernan's `ABRP_Uploader`. See `LICENSE.md` — the licence status i
 
 ## Non-negotiables
 
-1. **Telemetry is read-only.** The explicitly requested SWI69 WinClose integration is
-   the only vehicle-write exception: an opt-in service closes the four windows on the
-   WinClose door callback, requiring P and readable 0 km/h before and during the pulse.
-   It uses WinClose's CarState/VSM interfaces and the shared VehicleWriteGate; no other
-   vehicle settings may be written. Always send STOP when an active pulse exits.
+1. **Telemetry is read-only.** No vehicle settings may be written. Window automation
+   was removed in 2.2.5 at the user's request, including its service and door listener.
 2. **A failed read is not a zero.** Getters return `Integer`/`Float`/`Boolean` and `null`
    means "could not read". Null fields are omitted from the payload. Sending 0 for SOC
    tells ABRP the battery is empty and wrecks a live route plan.
@@ -43,9 +49,6 @@ UploadLog           last 20 attempts + derived service state — pure, unit-test
 SecurePrefs         credentials in EncryptedSharedPreferences, migrates plaintext
 AbrpApi             HTTP; credentials in the POST body, never the query string
 MainActivity        configuration, service state, upload log
-WindowCloseService independent, opt-in foreground service; no ABRP/GPS dependency
-WinCloseHardware   SWI69 adapter derived from the sibling winclose/WindowHardware.kt
-WindowClosePulse   bounded UP/STOP sequence; pure, unit-tested
 ```
 
 **Put logic in the pure classes.** Anything Android-free can be unit-tested on the JVM;
@@ -57,7 +60,7 @@ anything inside the service effectively cannot be tested without a car.
 |---|---|---|
 | `main` | everything shared | all builds |
 | `stable` | `UpdateHook` no-op | stable channel |
-| `unstable` | updater policy code; trigger suspended during the suite audit | unstable channel |
+| `unstable` | active GitHub pre-release updater and PackageInstaller result receiver | unstable channel |
 | `debug` | `VhalProbe` — enumerates the whole VHAL | debug builds only |
 | `testUnstable` | OTA policy tests | test only |
 

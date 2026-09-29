@@ -15,9 +15,7 @@ was moving. A proof of concept helps; a working exploit is not required.
 
 - Anything that lets another app on the head unit read the stored ABRP credentials.
 - Anything that gets attacker-controlled code installed through the unstable updater.
-- Any vehicle write outside the explicitly enabled SWI69 WinClose feature, or a window
-  close that bypasses P/readable-zero-speed checks, exceeds its five-second pulse, or
-  fails to attempt STOP on every window after interruption or failure.
+- Any vehicle-setting write. The app is read-only; window automation was removed in 2.2.5.
 - Telemetry that leaks credentials into logs, URLs or crash reports.
 
 ## What is not in scope
@@ -36,6 +34,3 @@ was moving. A proof of concept helps; a working exploit is not required.
   checks fail closed. The stable channel does not contain the updater at all.
 - The VHAL probe helpers, which enumerate the whole vehicle abstraction layer, exist only
   in debug builds.
-- Window closing uses WinClose's SWI69 CarState callback and VSM commands. Its service is
-  not exported, has its own opt-in switch, and holds no wake lock or alarm. It does not
-  assert that a sensorless window has physically closed or that anti-pinch is available.

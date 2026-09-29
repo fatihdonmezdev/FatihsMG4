@@ -78,6 +78,8 @@ final class WifiAutoConnect {
                 String name = c.SSID.replace("\"", "").trim();
                 if (!name.isEmpty() && !names.contains(name)) names.add(name);
             }
+        } catch (SecurityException e) {
+            Log.w(TAG, "Saved networks unavailable: permission denied");
         } catch (Throwable t) {
             Log.w(TAG, "getConfiguredNetworks refused: " + t.getMessage());
         }
@@ -126,6 +128,9 @@ final class WifiAutoConnect {
                     return Result.attempting(name);
                 }
             }
+            return Result.REFUSED;
+        } catch (SecurityException e) {
+            Log.w(TAG, "Wi-Fi connection refused: permission denied");
             return Result.REFUSED;
         } catch (Throwable t) {
             Log.w(TAG, "connect attempt failed: " + t.getMessage());

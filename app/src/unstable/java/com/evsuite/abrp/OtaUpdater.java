@@ -7,12 +7,14 @@ import android.content.pm.PackageInstaller;
 import android.util.Log;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
+import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
@@ -78,7 +80,7 @@ final class OtaUpdater {
         }
     }
 
-    /** Result of a check: null when there is nothing newer or the check failed. */
+    /** Result of a successful check: null means there is no newer eligible release. */
     static final class Update {
         final String versionName;
         final String apkUrl;
@@ -165,19 +167,21 @@ final class OtaUpdater {
      * Asks GitHub for the newest pre-release and returns it if it beats [currentVersion].
      * Runs on the caller's thread — never call from the main thread.
      */
-    static Update check(String currentVersion) {
-        HttpURLConnection conn = null;
+    static Update check(String currentVersion) throws IOException {
+        return check(currentVersion, (HttpURLConnection) new URL(RELEASES_API).openConnection());
+    }
+
+    /** Connection seam for exercising real response handling without a device or network. */
+    static Update check(String currentVersion, HttpURLConnection conn) throws IOException {
         try {
-            conn = (HttpURLConnection) new URL(RELEASES_API).openConnection();
             conn.setInstanceFollowRedirects(false);
             conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
             conn.setRequestProperty("User-Agent", "EVABRPUploader-Android");
             conn.setConnectTimeout(TIMEOUT_MS);
             conn.setReadTimeout(TIMEOUT_MS);
-            if (conn.getResponseCode() != 200) {
-                Log.w(TAG, "Release API returned " + conn.getResponseCode());
-                return null;
-            }
+            int status = conn.getResponseCode();
+            if (status != HttpURLConnection.HTTP_OK)
+                throw new IOException("Release API returned " + status);
 
             StringBuilder body = new StringBuilder();
             try (BufferedReader br = new BufferedReader(new InputStreamReader(
@@ -186,52 +190,34 @@ final class OtaUpdater {
                 while ((line = br.readLine()) != null) body.append(line);
             }
 
-            JSONArray releases = new JSONArray(body.toString());
-
-            // Scan every entry and keep the HIGHEST version, not simply the first one
-            // that beats the installed build: the API's ordering is by creation date, and
-            // a re-published or back-dated release would otherwise win over a newer one.
-            //
-            // Stable releases are skipped on purpose. This channel tracks pre-releases
-            // only — and a stable APK could not update a unstable install anyway, since
-            // the unstable applicationId carries a .unstable suffix.
-            //
-            // The version comes from the asset name, not the tag: the unstable channel is
-            // a single rolling pre-release tagged "unstable", overwritten on every build.
-            Update best = null;
-            for (int i = 0; i < releases.length(); i++) {
-                JSONObject release = releases.getJSONObject(i);
-                if (!release.optBoolean("prerelease", false)) continue;
-
-                JSONArray assets = release.optJSONArray("assets");
-                if (assets == null) continue;
-                for (int a = 0; a < assets.length(); a++) {
-                    JSONObject asset = assets.getJSONObject(a);
-                    String name = asset.optString("name", "");
-                    if (!name.toLowerCase(java.util.Locale.US).endsWith(".apk")) continue;
-                    if (!name.contains("unstable")) continue;
-
-                    String version = versionFromAssetName(name);
-                    if (version == null) continue;
-                    if (!isNewer(version, currentVersion)) continue;
-                    if (best != null && !isNewer(version, best.versionName)) continue;
-
-                    String url = asset.optString("browser_download_url", "");
-                    if (!isAllowedUrl(url)) {
-                        Log.w(TAG, "Rejected update URL from an unexpected host: " + url);
-                        continue;
-                    }
-                    best = new Update(version, url);
-                    break;
-                }
-            }
-            return best;
-        } catch (Exception e) {
-            Log.w(TAG, "Update check failed: " + e.getMessage());
-            return null;
+            return selectUpdate(new JSONArray(body.toString()), currentVersion);
+        } catch (JSONException e) {
+            throw new IOException("Invalid release response", e);
         } finally {
-            if (conn != null) conn.disconnect();
+            conn.disconnect();
         }
+    }
+
+    /** Scan every asset of every pre-release; asset ordering does not imply version order. */
+    static Update selectUpdate(JSONArray releases, String currentVersion) throws JSONException {
+        Update best = null;
+        for (int i = 0; i < releases.length(); i++) {
+            JSONObject release = releases.getJSONObject(i);
+            if (!release.optBoolean("prerelease", false) || release.optBoolean("draft", false)) continue;
+            JSONArray assets = release.optJSONArray("assets");
+            if (assets == null) continue;
+            for (int a = 0; a < assets.length(); a++) {
+                JSONObject asset = assets.getJSONObject(a);
+                String name = asset.optString("name", "");
+                if (!name.toLowerCase(Locale.US).contains("unstable")) continue;
+                String version = versionFromAssetName(name);
+                if (version == null || !isNewer(version, currentVersion)) continue;
+                if (best != null && !isNewer(version, best.versionName)) continue;
+                String url = asset.optString("browser_download_url", "");
+                if (isAllowedUrl(url)) best = new Update(version, url);
+            }
+        }
+        return best;
     }
 
     /**
@@ -378,6 +364,7 @@ final class OtaUpdater {
         }
         int sessionId = installer.createSession(params);
         PackageInstaller.Session session = null;
+        boolean committed = false;
         try {
             session = installer.openSession(sessionId);
             try (java.io.InputStream in = new java.io.FileInputStream(apk);
@@ -395,12 +382,14 @@ final class OtaUpdater {
             PendingIntent pending = PendingIntent.getBroadcast(context, sessionId, callback,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
             session.commit(pending.getIntentSender());
+            committed = true;
             Log.i(TAG, "OTA session " + sessionId + " committed (" + apk.length() + " bytes)");
-            session = null;
         } finally {
-            // Only reached when commit did not happen; an abandoned session frees its staging.
+            // Abandon failed staging, but always close our local handle after a commit too.
+            if (!committed) {
+                try { installer.abandonSession(sessionId); } catch (Throwable ignored) { }
+            }
             if (session != null) {
-                try { session.abandon(); } catch (Throwable ignored) { }
                 try { session.close(); } catch (Throwable ignored) { }
             }
         }

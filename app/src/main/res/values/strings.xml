@@ -1,27 +1,12 @@
 <resources>
-    <string name="window_close_title">Kapı açılınca camları kapat</string>
-    <string name="window_close_hint">P konumunda ve araç dururken WinClose kapı sinyaliyle dört cama 5 saniye kapatma komutu gönderilir. ABRP yüklemesinden bağımsız çalışır.</string>
-    <string name="window_close_stopped">Cam kapatma kapalı</string>
-    <string name="window_close_waiting">WinClose kapı sinyali bekleniyor</string>
-    <string name="window_close_closing">Dört cama kapatma komutu gönderiliyor…</string>
-    <string name="window_close_sent">5 saniyelik komut tamamlandı. Cam konumu sensörsüz olduğu için doğrulanamıyor.</string>
-    <string name="window_close_interrupted">Kapatma durdu veya komut gönderilemedi</string>
-    <string name="window_close_unavailable">Cam bağlantısı henüz hazır değil</string>
-    <string name="window_close_start_failed">Cam servisi başlatılamadı</string>
-    <string name="window_close_unsupported">Bu cam entegrasyonu yalnızca SWI69 için etkin</string>
-    <string name="window_close_no_system_uid">Bu sürüm araca yazamıyor (sistem imzası gerekli)</string>
-    <string name="window_close_notification">P ve 0 km/sa: kapı açılınca dört camı kapat</string>
-    <string name="window_close_disable">Kapat</string>
-    <string name="window_close_log_title">Olay kaydı</string>
     <string name="app_name">Fatih\'sMG4</string>
 
     <!-- Main screen -->
     <string name="tab_abrp">ABRP</string>
-    <string name="tab_service">Upload Service</string>
-    <string name="tab_vehicle">Araç</string>
-    <string name="tab_windows">Pencereler</string>
+    <string name="tab_service">Aktarım</string>
+    <string name="tab_vehicle">Genel</string>
     <string name="tab_wifi">Wi-Fi</string>
-    <string name="tab_log">Log</string>
+    <string name="tab_log">Kayıtlar</string>
 
     <!-- Wi-Fi page -->
     <string name="wifi_card_title">Wi-Fi Bağlantısı</string>
@@ -62,9 +47,9 @@
     <string name="helper_token">Find your token in the ABRP app: Settings → Connections → Generic (Manual Entry)</string>
     <string name="desc_toggle_api_key">Show or hide API key</string>
     <string name="desc_toggle_token">Show or hide user token</string>
-    <string name="btn_save">Save</string>
-    <string name="btn_test">Test Connection</string>
-    <string name="btn_import">Import file</string>
+    <string name="btn_save">Kaydet</string>
+    <string name="btn_test">Bağlantıyı test et</string>
+    <string name="btn_import">Dosyadan al</string>
 
     <!-- Config file import -->
     <string name="import_ok">Config imported — press Test to verify</string>

@@ -39,9 +39,6 @@ public class BootReceiver extends BroadcastReceiver {
         String action = intent.getAction();
         if (action == null || !START_ACTIONS.contains(action)) return;
 
-        // Window closing has its own switch and never requires ABRP credentials.
-        WindowCloseService.startIfEnabled(context);
-
         SharedPreferences prefs = context.getSharedPreferences("abrp_prefs", Context.MODE_PRIVATE);
         boolean enabled = prefs.getBoolean("service_enabled", false);
         boolean autostart = prefs.getBoolean(UploadSettings.KEY_AUTOSTART, UploadSettings.DEFAULT_AUTOSTART);

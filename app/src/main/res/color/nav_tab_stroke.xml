@@ -1,7 +1,1 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Nav tab outline. The selected tab keeps a stroke the same color as its fill so its
-     size doesn't jump a dp when the page changes. -->
-<selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_selected="true" android:color="@color/ev_accent" />
-    <item android:color="@color/ev_outline" />
-</selector>
+<selector xmlns:android="http://schemas.android.com/apk/res/android"><item android:state_selected="true" android:color="#806F6045"/><item android:color="@color/ev_transparent"/></selector>

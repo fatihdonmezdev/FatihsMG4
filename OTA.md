@@ -3,6 +3,25 @@
 How to ship an update the car will install by itself. Written for whoever does this
 next — probably me, having forgotten the details.
 
+## First upgrade from 2.2.3 or older
+
+Install the platform-signed 2.2.6 APK manually once if the car still runs 2.2.3 or older.
+Those builds use the old `pm install` path; publishing a newer APK does not repair the
+installer already running on the car. Builds from 2.2.4 use `PackageInstaller` sessions.
+Keep the unstable package ID, system shared UID and signing certificate when upgrading.
+
+The 2.2.5 build removes window automation. It also distinguishes failed release checks
+from a successful check with no newer release. On 2026-09-29, GitHub still published only
+2.2.3 at the last live check. The local 2.2.6 build includes these fixes and the redesigned
+UI; it becomes available to OTA only after publication as a pre-release asset named
+`FatihsMG4-unstable-2.2.6.apk`.
+
+The vehicle artifact uses `com.evsuite.abrp.unstable`, `android.uid.system`, and the
+DriveHub_Kamera platform key. Its certificate SHA-256 must be
+`c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8`.
+The stable build used for a Samsung UI preview is a separate package without OTA or the
+vehicle's shared UID; do not use that preview APK for the MG4 upgrade.
+
 ## What the updater actually looks for
 
 `OtaUpdater.check()` reads `https://api.github.com/repos/fatihdonmezdev/MG4ABRP/releases`
@@ -30,11 +49,11 @@ The version comes from the **asset filename**, not the git tag. The tag can stay
 1. **Raise the version.** `app/build.gradle`, `defaultConfig`:
 
    ```gradle
-   versionCode 20          // must increase — Android orders updates by this, not by name
-   versionName "2.2.3"
+   versionCode 23          // must increase — Android orders updates by this, not by name
+   versionName "2.2.6"
    ```
 
-   The unstable flavour appends its own suffix, so `2.2.3` becomes `2.2.3.0-unstable`.
+   The unstable flavour appends its own suffix, so `2.2.6` becomes `2.2.6.0-unstable`.
    Check what the installed build reports before picking a number: the app's About
    dialog shows it, and `isNewer` compares numerically segment by segment.
 
@@ -57,7 +76,7 @@ The version comes from the **asset filename**, not the git tag. The tag can stay
    "$BT/apksigner" sign \
      --key  "$KEYS/platform.pk8" \
      --cert "$KEYS/platform.x509.pem" \
-     --out  FatihsMG4-unstable-2.2.3.apk \
+     --out  FatihsMG4-unstable-2.2.6.apk \
      aligned.apk
 
    rm aligned.apk
@@ -69,7 +88,7 @@ The version comes from the **asset filename**, not the git tag. The tag can stay
 4. **Verify the signer** before uploading. It must say `CN=Android`:
 
    ```bash
-   "$BT/apksigner" verify --print-certs FatihsMG4-unstable-2.2.3.apk | grep DN:
+   "$BT/apksigner" verify --print-certs FatihsMG4-unstable-2.2.6.apk
    ```
 
 5. **Publish.** On github.com/fatihdonmezdev/MG4ABRP → Releases → Draft a new release:

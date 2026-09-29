@@ -12,7 +12,6 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -21,6 +20,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
@@ -44,17 +44,26 @@ public class MainActivity extends AppCompatActivity {
     static final String WIFI_AUTO_KEY = "wifi_auto_connect";
     private static final String REPOSITORY_URL = "https://github.com/fatihdonmezdev/MG4ABRP";
 
-    /** Top-bar tabs, in page order. Parallel to {@link #panes}. */
+    /** Navigation destinations in page order. Parallel to {@link #panes}. */
     private static final int[] TAB_IDS =
-            { R.id.tabAbrp, R.id.tabService, R.id.tabVehicle, R.id.tabWindows, R.id.tabWifi,
+            { R.id.tabVehicle, R.id.tabAbrp, R.id.tabService, R.id.tabWifi,
               R.id.tabLog };
+
+    private static final int[] PAGE_TITLES = {
+            R.string.design_overview_title, R.string.design_abrp_title,
+            R.string.design_service_title, R.string.design_wifi_title, R.string.design_log_title
+    };
+    private static final int[] PAGE_SUBTITLES = {
+            R.string.design_overview_subtitle, R.string.design_abrp_subtitle,
+            R.string.design_service_subtitle, R.string.design_wifi_subtitle, R.string.design_log_subtitle
+    };
 
     // Status colours come from the palette, not from the Material swatches: #4CAF50 and
     // #F44336 sit around 4:1 on this background, which disappears behind a sunlit
     // reflection. The palette entries are the lightened variants (7:1 and above).
-    private static final int COLOR_OK      = 0xFF8FE6A6;
-    private static final int COLOR_ERROR   = 0xFFFF9A9A;
-    private static final int COLOR_PENDING = 0xFFC6CFD8;
+    private static final int COLOR_OK      = 0xFFA4DCC1;
+    private static final int COLOR_ERROR   = 0xFFFFB4AB;
+    private static final int COLOR_PENDING = 0xFFBDC4C6;
 
     private TextInputLayout   apiKeyLayout;
     private TextInputEditText apiKeyInput;
@@ -62,10 +71,6 @@ public class MainActivity extends AppCompatActivity {
     private TextInputEditText tokenInput;
     private SwitchMaterial    serviceSwitch;
     private SwitchMaterial    autostartSwitch;
-    private SwitchMaterial    windowCloseSwitch;
-    private CompoundButton.OnCheckedChangeListener windowCloseListener;
-    private TextView          windowCloseStatus;
-    private TextView          windowCloseLog;
     private TextView          statusText;
     private Button            testButton;
     private View              connectionStatusRow;
@@ -80,10 +85,9 @@ public class MainActivity extends AppCompatActivity {
     private View servicePane;
     private View logPane;
     private View vehiclePane;
-    private View windowsPane;
     private View wifiPane;
 
-    /** The six pages, in the order the top bar lists them. Parallel to {@link #TAB_IDS}. */
+    /** The five pages in navigation order. Parallel to {@link #TAB_IDS}. */
     private View[] panes;
 
     /** Wi-Fi page. The helper is the same one the upload service uses on its own tick. */
@@ -117,7 +121,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Wires the top bar to the pager: every tab is a page, and every page is a tab.
+     * Wires the navigation to the pager: every tab is a page, and every page is a tab.
      *
      * Each page has its own view type, so the pager asks for it once and keeps it: these
      * views are the activity's own, held in {@link #panes}, not rows to be recycled.
@@ -140,10 +144,8 @@ public class MainActivity extends AppCompatActivity {
                 // state, exactly as they did when they were siblings in the layout.
             }
         });
-        // All of them stay alive. They are cheap, and the service switch, the call log, the
-        // window-close status and the vehicle readings are refreshed by the tick whether or
-        // not their page is on screen — refreshWindowClose in particular dereferences views
-        // the pager would otherwise be free to detach.
+        // Keep all pages alive: the service switch, log and vehicle readings are refreshed
+        // by the tick even when their page is off screen.
         pager.setOffscreenPageLimit(panes.length - 1);
         pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override public void onPageSelected(int position) { markCurrentPage(position); }
@@ -159,7 +161,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Marks the top-bar tab of the page on screen.
+     * Marks the destination and labels the page on screen.
      *
      * Only isSelected is set: fill, text, icon and stroke come from the
      * res/color/nav_tab_*.xml selectors applied by the Widget.EV.NavTab style. isSelected
@@ -169,6 +171,8 @@ public class MainActivity extends AppCompatActivity {
         for (int i = 0; i < TAB_IDS.length; i++) {
             findViewById(TAB_IDS[i]).setSelected(i == position);
         }
+        ((TextView) findViewById(R.id.header_title)).setText(PAGE_TITLES[position]);
+        ((TextView) findViewById(R.id.header_subtitle)).setText(PAGE_SUBTITLES[position]);
     }
 
     /** Refreshes state + call log while the screen is visible. */
@@ -179,7 +183,6 @@ public class MainActivity extends AppCompatActivity {
             refreshCallLog();
             refreshVehicle();
             refreshWifi();
-            refreshWindowClose();
             uiHandler.postDelayed(this, 2_000L);
         }
     };
@@ -200,13 +203,14 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        getDelegate().setLocalNightMode(AppCompatDelegate.MODE_NIGHT_YES);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
         prefs = getSharedPreferences("abrp_prefs", MODE_PRIVATE);
         securePrefs = SecurePrefs.get(this);
 
-        // The three pages are inflated here, once, and handed to the pager as fixed,
+        // The pages are inflated here, once, and handed to the pager as fixed,
         // non-recycled items. That is what lets every widget below be looked up now and
         // held for the life of the activity, the way it was when the panes were siblings
         // in activity_main.xml — a recycled page would invalidate these references as
@@ -214,14 +218,12 @@ public class MainActivity extends AppCompatActivity {
         abrpPane    = inflatePane(R.layout.pane_abrp);
         servicePane = inflatePane(R.layout.pane_service);
         vehiclePane   = inflatePane(R.layout.pane_vehicle);
-        windowsPane = inflatePane(R.layout.pane_windows);
         wifiPane    = inflatePane(R.layout.pane_wifi);
         logPane     = inflatePane(R.layout.pane_log);
-        panes = new View[] { abrpPane, servicePane, vehiclePane, windowsPane, wifiPane, logPane };
+        panes = new View[] { vehiclePane, abrpPane, servicePane, wifiPane, logPane };
 
         bindVehiclePane();
         bindWifiPane();
-        bindWindowClose();
 
         apiKeyLayout        = abrpPane.findViewById(R.id.api_key_layout);
         apiKeyInput         = abrpPane.findViewById(R.id.api_key_input);
@@ -327,49 +329,11 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            android.util.DisplayMetrics metrics = getResources().getDisplayMetrics();
+            int width = Math.min((int) (760 * metrics.density),
+                    metrics.widthPixels - (int) (32 * metrics.density));
+            dialog.getWindow().setLayout(width, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
         }
-    }
-
-    private void bindWindowClose() {
-        windowCloseSwitch = windowsPane.findViewById(R.id.window_close_switch);
-        windowCloseStatus = windowsPane.findViewById(R.id.window_close_status);
-        windowCloseLog = windowsPane.findViewById(R.id.window_close_log);
-        windowCloseListener = (button, enabled) -> {
-            prefs.edit().putBoolean(WindowCloseService.KEY_ENABLED, enabled).apply();
-            if (enabled) WindowCloseService.startIfEnabled(this);
-            else stopService(new Intent(this, WindowCloseService.class));
-            refreshWindowClose();
-        };
-        windowCloseSwitch.setChecked(prefs.getBoolean(WindowCloseService.KEY_ENABLED, false));
-        windowCloseSwitch.setOnCheckedChangeListener(windowCloseListener);
-        // A build that cannot reach the vehicle service would accept the toggle and then fail
-        // every command, which reads as a broken feature rather than an inapplicable one.
-        if (!WindowCloseService.canWriteToVehicle()) windowCloseSwitch.setEnabled(false);
-        WindowCloseService.startIfEnabled(this);
-        refreshWindowClose();
-    }
-
-    private void refreshWindowClose() {
-        if (windowCloseSwitch == null) return;
-        boolean enabled = prefs.getBoolean(WindowCloseService.KEY_ENABLED, false);
-        if (windowCloseSwitch.isChecked() != enabled) {
-            // Detached first: setChecked re-enters the listener, which would write the pref
-            // and restart the service on every one of these two-second refreshes.
-            windowCloseSwitch.setOnCheckedChangeListener(null);
-            windowCloseSwitch.setChecked(enabled);
-            windowCloseSwitch.setOnCheckedChangeListener(windowCloseListener);
-        }
-        FirmwareInfo.Gen generation = FirmwareInfo.INSTANCE.getGeneration();
-        if (!WindowCloseService.canWriteToVehicle()) {
-            windowCloseStatus.setText(R.string.window_close_no_system_uid);
-        } else if (!enabled) {
-            windowCloseStatus.setText(R.string.window_close_stopped);
-        } else if (generation != FirmwareInfo.Gen.UNKNOWN && generation != FirmwareInfo.Gen.SWI69) {
-            windowCloseStatus.setText(R.string.window_close_unsupported);
-        } else {
-            windowCloseStatus.setText(WindowCloseService.statusResource());
-        }
-        windowCloseLog.setText(WindowCloseService.eventLog());
     }
 
     @Override
@@ -638,8 +602,8 @@ public class MainActivity extends AppCompatActivity {
             if (sec == current.intervalSec) selected = i;
         }
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item, labels);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                this, R.layout.spinner_value, labels);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown);
         intervalSpinner.setAdapter(adapter);
         intervalSpinner.setSelection(selected);
         intervalSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -690,7 +654,7 @@ public class MainActivity extends AppCompatActivity {
      * Checks for a newer build, and installs one if it is there.
      *
      * The button is disabled for the duration rather than guarded by a flag: the whole
-     * sequence — API call, download, {@code pm install} — runs on a background thread, and
+     * sequence — API call, download, installer staging — runs on a background thread, and
      * a second press would start a second download of the same APK. It comes back on when
      * the result lands, whatever that result is.
      *
