@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.17] - 2026-09-30
+
+### Fixed
+
+- Replaced the custom OTA downloader with DriveHub_Dort's Android DownloadManager flow,
+  then stages and verifies the downloaded bytes before installation.
+
 ## [2.2.16] - 2026-09-30
 
 ### Added

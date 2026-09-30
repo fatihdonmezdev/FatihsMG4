@@ -1,14 +1,17 @@
 package com.evsuite.abrp;
 
 import android.app.PendingIntent;
+import android.app.DownloadManager;
 import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInstaller;
 import android.content.pm.ResolveInfo;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.os.ParcelFileDescriptor;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -346,64 +349,59 @@ final class OtaUpdater {
             Log.w(TAG, "Refusing to download from " + update.apkUrl);
             return null;
         }
-        File target = new File(context.getCacheDir(), CACHE_PREFIX
-                + java.util.UUID.randomUUID() + ".apk");
-        File temporary = null;
+        DownloadManager manager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+        if (manager == null) return null;
+        String publicName = downloadFileName(update.versionName);
+        File publicFile = new File(Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_DOWNLOADS), publicName);
+        if (publicFile.exists() && !publicFile.delete()) return null;
+        long downloadId = -1L;
         try {
-            temporary = File.createTempFile(CACHE_PREFIX, ".apk", context.getCacheDir());
-            URL current = new URL(update.apkUrl);
-            for (int redirects = 0; redirects <= 5; redirects++) {
-                if (!isAllowedUrl(current.toString())) return null;
-                HttpURLConnection connection = (HttpURLConnection) current.openConnection();
-                connection.setInstanceFollowRedirects(false);
-                connection.setConnectTimeout(TIMEOUT_MS);
-                connection.setReadTimeout(TIMEOUT_MS);
-                try {
-                    int status = connection.getResponseCode();
-                    if (status >= 300 && status <= 399) {
-                        String location = connection.getHeaderField("Location");
-                        if (location == null) return null;
-                        current = current.toURI().resolve(location).toURL();
-                        if (!isAllowedUrl(current.toString())) return null;
-                        continue;
-                    }
-                    if (status != HttpURLConnection.HTTP_OK) return null;
-                    MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                    long total = connection.getContentLengthLong();
-                    long received = 0;
-                    int lastPercent = -1;
-                    try (FileOutputStream output = new FileOutputStream(temporary)) {
-                        try (java.io.InputStream input = connection.getInputStream()) {
-                            byte[] buffer = new byte[32 * 1024];
-                            int count;
-                            while ((count = input.read(buffer)) != -1) {
-                                output.write(buffer, 0, count);
-                                digest.update(buffer, 0, count);
-                                received += count;
-                                int percent = total > 0 ? (int) Math.min(100, received * 100 / total) : -1;
-                                if (listener != null && percent != lastPercent) {
-                                    listener.onProgress(percent);
-                                    lastPercent = percent;
-                                }
-                            }
-                        }
-                        output.getFD().sync();
-                    }
-                    String actual = hex(digest.digest());
-                    if (!actual.equalsIgnoreCase(expectedSha256)) {
-                        Log.w(TAG, "Downloaded APK SHA-256 mismatch");
-                        return null;
-                    }
-                    if (!temporary.renameTo(target)) return null;
-                    return target;
-                } finally {
-                    connection.disconnect();
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(update.apkUrl))
+                    .setTitle("EVABRPUploader " + update.versionName)
+                    .setDescription("Güncelleme indiriliyor")
+                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, publicName)
+                    .setAllowedOverMetered(true)
+                    .setAllowedOverRoaming(true);
+            downloadId = manager.enqueue(request);
+            while (true) {
+                try (Cursor cursor = manager.query(new DownloadManager.Query().setFilterById(downloadId))) {
+                    if (cursor == null || !cursor.moveToFirst()) return null;
+                    int status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                    long received = cursor.getLong(cursor.getColumnIndexOrThrow(
+                            DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                    long total = cursor.getLong(cursor.getColumnIndexOrThrow(
+                            DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                    if (listener != null) listener.onProgress(total > 0
+                            ? (int) Math.min(100, received * 100 / total) : -1);
+                    if (status == DownloadManager.STATUS_SUCCESSFUL) break;
+                    if (status == DownloadManager.STATUS_FAILED) return null;
                 }
+                Thread.sleep(250L);
             }
+
+            File staged = new File(context.getCacheDir(), CACHE_PREFIX
+                    + java.util.UUID.randomUUID() + ".apk");
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (ParcelFileDescriptor descriptor = manager.openDownloadedFile(downloadId);
+                 java.io.InputStream input = new ParcelFileDescriptor.AutoCloseInputStream(descriptor);
+                 FileOutputStream output = new FileOutputStream(staged)) {
+                byte[] buffer = new byte[64 * 1024];
+                int count;
+                while ((count = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, count);
+                    digest.update(buffer, 0, count);
+                }
+                output.getFD().sync();
+            }
+            if (!hex(digest.digest()).equalsIgnoreCase(expectedSha256)) {
+                staged.delete();
+                return null;
+            }
+            return staged;
         } catch (Exception e) {
             Log.w(TAG, "Update download failed", e);
-        } finally {
-            if (temporary != null && temporary.exists()) temporary.delete();
         }
         return null;
     }
