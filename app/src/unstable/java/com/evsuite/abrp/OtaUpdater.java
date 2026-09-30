@@ -4,7 +4,12 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInstaller;
+import android.net.Uri;
+import android.os.Build;
+import android.provider.Settings;
 import android.util.Log;
+
+import androidx.core.content.FileProvider;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -414,6 +419,8 @@ final class OtaUpdater {
         UNREADABLE_ARCHIVE,
         /** Handed to the platform. The outcome arrives at {@link OtaInstallResultReceiver}. */
         SESSION_STARTED,
+        /** Session install was unavailable; the system's interactive installer was opened. */
+        INSTALL_UI_STARTED,
         /** The session could not be created, written or committed. */
         SESSION_FAILED
     }
@@ -437,8 +444,14 @@ final class OtaUpdater {
             commitSession(context, apk);
             return InstallResult.SESSION_STARTED;
         } catch (Throwable t) {
-            Log.w(TAG, "OTA session install failed", t);
-            return InstallResult.SESSION_FAILED;
+            Log.w(TAG, "OTA session install failed; trying system install UI", t);
+            try {
+                launchInstallerActivity(context, apk);
+                return InstallResult.INSTALL_UI_STARTED;
+            } catch (Throwable fallback) {
+                Log.w(TAG, "OTA install UI failed", fallback);
+                return InstallResult.SESSION_FAILED;
+            }
         }
     }
 
@@ -508,6 +521,43 @@ final class OtaUpdater {
             if (session != null) {
                 try { session.close(); } catch (Throwable ignored) { }
             }
+        }
+    }
+
+    /** DriveHub_Dort-compatible fallback for head units that refuse installer sessions. */
+    private static void launchInstallerActivity(Context context, File apk) {
+        if (Build.VERSION.SDK_INT >= 26
+                && !context.getPackageManager().canRequestPackageInstalls()) {
+            Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                    .setData(Uri.parse("package:" + context.getPackageName()))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(settings);
+            throw new IllegalStateException("unknown sources permission required");
+        }
+
+        Uri contentUri = FileProvider.getUriForFile(context,
+                context.getPackageName() + ".fileprovider", apk);
+        Intent install = new Intent(Intent.ACTION_VIEW)
+                .setDataAndType(contentUri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        grantToInstallers(context, contentUri);
+        if (install.resolveActivity(context.getPackageManager()) == null) {
+            throw new IllegalStateException("No package installer activity");
+        }
+        context.startActivity(install);
+        Log.i(TAG, "System install UI opened for " + apk.getName());
+    }
+
+    private static void grantToInstallers(Context context, Uri uri) {
+        String[] packages = {
+                "com.android.packageinstaller",
+                "com.google.android.packageinstaller",
+                "com.samsung.android.packageinstaller"
+        };
+        for (String packageName : packages) {
+            try {
+                context.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } catch (Throwable ignored) { }
         }
     }
 

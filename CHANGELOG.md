@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.12] - 2026-09-30
+
+### Fixed
+
+- When PackageInstaller sessions cannot start on the head unit, OTA now opens Android's
+  interactive APK installer through a cache-scoped FileProvider, matching DriveHub_Dort.
+
 ## [2.2.11] - 2026-09-30
 
 ### Changed
