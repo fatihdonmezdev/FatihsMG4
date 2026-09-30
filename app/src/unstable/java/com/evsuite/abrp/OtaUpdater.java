@@ -1,11 +1,14 @@
 package com.evsuite.abrp;
 
 import android.app.PendingIntent;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInstaller;
+import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -17,6 +20,7 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
@@ -535,17 +539,41 @@ final class OtaUpdater {
             throw new IllegalStateException("unknown sources permission required");
         }
 
+        File publicApk = copyToPublicDownloads(apk);
         Uri contentUri = FileProvider.getUriForFile(context,
-                context.getPackageName() + ".fileprovider", apk);
+                context.getPackageName() + ".fileprovider", publicApk);
         Intent install = new Intent(Intent.ACTION_VIEW)
                 .setDataAndType(contentUri, "application/vnd.android.package-archive")
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        install.setClipData(ClipData.newRawUri("EVABRPUploader update", contentUri));
         grantToInstallers(context, contentUri);
         if (install.resolveActivity(context.getPackageManager()) == null) {
             throw new IllegalStateException("No package installer activity");
         }
         context.startActivity(install);
-        Log.i(TAG, "System install UI opened for " + apk.getName());
+        Log.i(TAG, "System install UI opened for " + publicApk.getAbsolutePath());
+    }
+
+    private static File copyToPublicDownloads(File source) {
+        File downloads = Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_DOWNLOADS);
+        if (downloads == null || (!downloads.isDirectory() && !downloads.mkdirs())) {
+            throw new IllegalStateException("Downloads directory unavailable");
+        }
+        File destination = new File(downloads, "FatihsMG4-OTA-update.apk");
+        try (FileInputStream input = new FileInputStream(source);
+             FileOutputStream output = new FileOutputStream(destination, false)) {
+            byte[] buffer = new byte[64 * 1024];
+            int count;
+            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+            output.getFD().sync();
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not stage APK in Downloads", e);
+        }
+        if (destination.length() != source.length()) {
+            throw new IllegalStateException("Staged APK size mismatch");
+        }
+        return destination;
     }
 
     private static void grantToInstallers(Context context, Uri uri) {
@@ -557,6 +585,15 @@ final class OtaUpdater {
         for (String packageName : packages) {
             try {
                 context.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } catch (Throwable ignored) { }
+        }
+        Intent probe = new Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/vnd.android.package-archive");
+        for (ResolveInfo info : context.getPackageManager().queryIntentActivities(probe, 0)) {
+            if (info.activityInfo == null) continue;
+            try {
+                context.grantUriPermission(info.activityInfo.packageName, uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION);
             } catch (Throwable ignored) { }
         }
     }

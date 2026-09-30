@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.14] - 2026-09-30
+
+### Fixed
+
+- Stage fallback OTA packages in public Downloads and grant the resolved system installer
+  explicit read access, avoiding the MG head unit's private-cache package parse failure.
+
 ## [2.2.13] - 2026-09-30
 
 ### Changed
