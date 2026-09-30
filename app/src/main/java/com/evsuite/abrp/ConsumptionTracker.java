@@ -5,10 +5,7 @@ import android.content.SharedPreferences;
 
 import com.evsuite.hardware.telemetry.EnergySnapshot;
 
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.temporal.WeekFields;
 
 /** Persistent, read-only trip/lifetime integration patterned after DriveHub_Dort. */
 final class ConsumptionTracker {
@@ -29,23 +26,18 @@ final class ConsumptionTracker {
     }
 
     private final SharedPreferences prefs;
-    private Totals lifetime, week, month, tripA, tripB;
-    private String weekId, monthId;
+    private Totals lifetime, tripA, tripB;
     private long lastMs;
     private Float lastSpeed, lastPower, lastSoc;
 
     private ConsumptionTracker(Context context) {
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        lifetime = load("life"); week = load("week"); month = load("month");
-        tripA = load("a"); tripB = load("b");
-        weekId = prefs.getString("week_id", "");
-        monthId = prefs.getString("month_id", "");
-        rollPeriods(System.currentTimeMillis());
+        lifetime = load("life"); tripA = load("a"); tripB = load("b");
+        migrateCalendarCounters();
     }
 
     synchronized void sample(EnergySnapshot s) {
         long now = s.getTimestampMs();
-        rollPeriods(now);
         if (lastMs > 0 && now > lastMs) {
             double hours = (now - lastMs) / 3_600_000d;
             // Never bridge a process pause/sleep into invented driving data.
@@ -59,8 +51,10 @@ final class ConsumptionTracker {
                 double dsoc = (lastSoc == null || s.getSocPercent() == null ||
                         Boolean.TRUE.equals(s.getChargePortConnected())) ? 0d : lastSoc - s.getSocPercent();
                 lifetime = add(lifetime, km, kwh, hours, dsoc);
-                week = add(week, km, kwh, hours, dsoc);
-                month = add(month, km, kwh, hours, dsoc);
+                String dayKey = "day_" + LocalDate.now();
+                SharedPreferences.Editor daily = prefs.edit();
+                save(daily, dayKey, add(load(dayKey), km, kwh, hours, dsoc));
+                daily.commit();
                 tripA = add(tripA, km, kwh, hours, dsoc);
                 tripB = add(tripB, km, kwh, hours, dsoc);
                 persist();
@@ -72,7 +66,7 @@ final class ConsumptionTracker {
 
     synchronized Totals totals(Period period) {
         switch (period) {
-            case WEEK: return week; case MONTH: return month; case TRIP_A: return tripA;
+            case WEEK: return rollingDays(7); case MONTH: return rollingDays(30); case TRIP_A: return tripA;
             case TRIP_B: return tripB; default: return lifetime;
         }
     }
@@ -86,21 +80,29 @@ final class ConsumptionTracker {
 
     synchronized void persist() {
         SharedPreferences.Editor e = prefs.edit();
-        save(e, "life", lifetime); save(e, "week", week); save(e, "month", month);
+        save(e, "life", lifetime);
         save(e, "a", tripA); save(e, "b", tripB);
-        e.putString("week_id", weekId).putString("month_id", monthId);
         e.commit();
     }
 
-    private void rollPeriods(long nowMs) {
-        LocalDate date = Instant.ofEpochMilli(nowMs).atZone(ZoneId.systemDefault()).toLocalDate();
-        WeekFields iso = WeekFields.ISO;
-        String currentWeek = date.get(iso.weekBasedYear()) + "-W" + date.get(iso.weekOfWeekBasedYear());
-        String currentMonth = date.getYear() + "-" + date.getMonthValue();
-        boolean changed = false;
-        if (!currentWeek.equals(weekId)) { weekId = currentWeek; week = zero(); changed = true; }
-        if (!currentMonth.equals(monthId)) { monthId = currentMonth; month = zero(); changed = true; }
-        if (changed) persist();
+    private Totals rollingDays(int days) {
+        Totals result = zero();
+        LocalDate today = LocalDate.now();
+        for (int i = 0; i < days; i++) {
+            Totals day = load("day_" + today.minusDays(i));
+            result = add(result, day.km, day.kwh, day.hours, day.soc);
+        }
+        return result;
+    }
+
+    /** Preserve anything gathered by 2.2.24 by treating its just-created counter as today. */
+    private void migrateCalendarCounters() {
+        if (prefs.getBoolean("rolling_days_migrated", false)) return;
+        Totals old = load("week");
+        SharedPreferences.Editor e = prefs.edit();
+        if (old.km != 0 || old.kwh != 0 || old.hours != 0 || old.soc != 0)
+            save(e, "day_" + LocalDate.now(), old);
+        e.putBoolean("rolling_days_migrated", true).commit();
     }
 
     private Totals load(String key) { return new Totals(bits(key,"km"), bits(key,"kwh"), bits(key,"h"), bits(key,"soc")); }

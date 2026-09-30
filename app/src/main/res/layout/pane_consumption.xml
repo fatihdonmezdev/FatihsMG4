@@ -6,8 +6,8 @@
       <HorizontalScrollView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:scrollbars="none">
        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
         <com.google.android.material.button.MaterialButton android:id="@+id/consumption_lifetime" style="@style/Widget.EV.Button.Outlined" android:layout_width="wrap_content" android:layout_height="56dp" android:text="Tüm zamanlar"/>
-        <com.google.android.material.button.MaterialButton android:id="@+id/consumption_week" style="@style/Widget.EV.Button.Outlined" android:layout_width="wrap_content" android:layout_height="56dp" android:layout_marginStart="8dp" android:text="Bu hafta"/>
-        <com.google.android.material.button.MaterialButton android:id="@+id/consumption_month" style="@style/Widget.EV.Button.Outlined" android:layout_width="wrap_content" android:layout_height="56dp" android:layout_marginStart="8dp" android:text="Bu ay"/>
+        <com.google.android.material.button.MaterialButton android:id="@+id/consumption_week" style="@style/Widget.EV.Button.Outlined" android:layout_width="wrap_content" android:layout_height="56dp" android:layout_marginStart="8dp" android:text="Son 7 gün"/>
+        <com.google.android.material.button.MaterialButton android:id="@+id/consumption_month" style="@style/Widget.EV.Button.Outlined" android:layout_width="wrap_content" android:layout_height="56dp" android:layout_marginStart="8dp" android:text="Son 30 gün"/>
         <com.google.android.material.button.MaterialButton android:id="@+id/consumption_trip_a" style="@style/Widget.EV.Button.Outlined" android:layout_width="wrap_content" android:layout_height="56dp" android:layout_marginStart="8dp" android:text="Trip A"/>
         <com.google.android.material.button.MaterialButton android:id="@+id/consumption_trip_b" style="@style/Widget.EV.Button.Outlined" android:layout_width="wrap_content" android:layout_height="56dp" android:layout_marginStart="8dp" android:text="Trip B"/>
        </LinearLayout>
@@ -22,6 +22,6 @@
       </GridLayout>
       <com.google.android.material.button.MaterialButton android:id="@+id/consumption_reset" style="@style/Widget.EV.Button.Outlined" android:layout_width="match_parent" android:layout_height="64dp" android:layout_marginTop="12dp" android:text="Seçili tripi sıfırla" android:visibility="gone"/>
     </LinearLayout>
-    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Hafta, ay, tüm zamanlar ve Trip A/B cihazda kalıcı saklanır; uygulama ve OTA güncellemeleriyle silinmez." android:textAppearance="@style/Text.EV.Secondary"/>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Son 7/30 gün, tüm zamanlar ve Trip A/B cihazda kalıcı saklanır; uygulama ve OTA güncellemeleriyle silinmez." android:textAppearance="@style/Text.EV.Secondary"/>
   </LinearLayout>
 </ScrollView>
