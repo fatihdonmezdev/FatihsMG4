@@ -117,25 +117,8 @@ final class UpdateHook {
         if (apk == null) return "İndirme veya SHA-256 doğrulaması başarısız ("
                 + update.versionName + ")";
 
-        OtaUpdater.InstallResult result = OtaUpdater.install(app, apk);
-        // FileProvider's interactive installer opens asynchronously and still needs this file.
-        // Other outcomes have either streamed the bytes already or rejected the archive.
-        if (result != OtaUpdater.InstallResult.INSTALL_UI_STARTED && !apk.delete()) {
-            Log.w(TAG, "Could not remove cached OTA APK");
-        }
-
-        switch (result) {
-            case SESSION_STARTED:
-                // Deliberately not "Güncellendi": committing a session is not installing. The
-                // platform may still want the driver to confirm, and either way the verdict
-                // arrives at OtaInstallResultReceiver, not here.
-                return "Kuruluyor: " + update.versionName + " — ekrandaki onayı bekleyin";
-            case INSTALL_UI_STARTED:
-                return "Kurulum ekranı açıldı: " + update.versionName;
-            case UNREADABLE_ARCHIVE:
-                return "Kurulum reddedildi: APK okunamadı";
-            default:
-                return "Kurulum başlatılamadı (" + update.versionName + ") — Log sayfasına bakın";
-        }
+        if (!OtaUpdater.openDownloads(app))
+            return "APK Downloads'a indirildi; dosya yöneticisi açılamadı";
+        return update.versionName + ".apk Downloads'a indirildi — dosyaya dokunup kurun";
     }
 }

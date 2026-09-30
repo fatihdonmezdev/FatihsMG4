@@ -337,7 +337,7 @@ final class OtaUpdater {
         String safe = (versionName == null || versionName.isEmpty())
                 ? "unknown"
                 : versionName.toLowerCase(Locale.US).replaceAll("[^a-z0-9._-]", "_");
-        return "EVABRPUploader-unstable-" + safe + ".apk";
+        return safe + ".apk";
     }
 
     /**
@@ -381,25 +381,20 @@ final class OtaUpdater {
                 Thread.sleep(250L);
             }
 
-            File staged = new File(context.getCacheDir(), CACHE_PREFIX
-                    + java.util.UUID.randomUUID() + ".apk");
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             try (ParcelFileDescriptor descriptor = manager.openDownloadedFile(downloadId);
-                 java.io.InputStream input = new ParcelFileDescriptor.AutoCloseInputStream(descriptor);
-                 FileOutputStream output = new FileOutputStream(staged)) {
+                 java.io.InputStream input = new ParcelFileDescriptor.AutoCloseInputStream(descriptor)) {
                 byte[] buffer = new byte[64 * 1024];
                 int count;
                 while ((count = input.read(buffer)) != -1) {
-                    output.write(buffer, 0, count);
                     digest.update(buffer, 0, count);
                 }
-                output.getFD().sync();
             }
             if (!hex(digest.digest()).equalsIgnoreCase(expectedSha256)) {
-                staged.delete();
+                if (!publicFile.delete()) Log.w(TAG, "Could not remove invalid OTA file");
                 return null;
             }
-            return staged;
+            return publicFile;
         } catch (Exception e) {
             Log.w(TAG, "Update download failed", e);
         }
@@ -410,6 +405,32 @@ final class OtaUpdater {
         StringBuilder out = new StringBuilder(bytes.length * 2);
         for (byte value : bytes) out.append(String.format(Locale.US, "%02x", value));
         return out.toString();
+    }
+
+    /** Opens Android's document UI directly in Downloads; the driver chooses the APK. */
+    static boolean openDownloads(Context context) {
+        Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (Build.VERSION.SDK_INT >= 26) {
+            picker.putExtra("android.provider.extra.INITIAL_URI", Uri.parse(
+                    "content://com.android.externalstorage.documents/document/primary%3ADownload"));
+        }
+        try {
+            context.startActivity(picker);
+            return true;
+        } catch (Throwable first) {
+            try {
+                Intent downloads = new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(downloads);
+                return true;
+            } catch (Throwable second) {
+                Log.w(TAG, "No Downloads UI available", second);
+                return false;
+            }
+        }
     }
 
     /**

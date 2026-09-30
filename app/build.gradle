@@ -34,8 +34,8 @@ android {
         applicationId "com.evsuite.abrp"
         minSdk 27
         targetSdk 36
-        versionCode 36
-        versionName "2.2.19"
+        versionCode 37
+        versionName "2.2.20"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
