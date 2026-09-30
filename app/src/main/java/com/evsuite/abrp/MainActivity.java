@@ -46,15 +46,15 @@ public class MainActivity extends AppCompatActivity {
 
     /** Navigation destinations in page order. Parallel to {@link #panes}. */
     private static final int[] TAB_IDS =
-            { R.id.tabVehicle, R.id.tabAbrp, R.id.tabService, R.id.tabWifi,
+            { R.id.tabVehicle, R.id.tabConsumption, R.id.tabCharging, R.id.tabAbrp, R.id.tabService, R.id.tabWifi,
               R.id.tabLog };
 
     private static final int[] PAGE_TITLES = {
-            R.string.design_overview_title, R.string.design_abrp_title,
+            R.string.design_overview_title, R.string.consumption_title, R.string.charging_title, R.string.design_abrp_title,
             R.string.design_service_title, R.string.design_wifi_title, R.string.design_log_title
     };
     private static final int[] PAGE_SUBTITLES = {
-            R.string.design_overview_subtitle, R.string.design_abrp_subtitle,
+            R.string.design_overview_subtitle, R.string.consumption_subtitle, R.string.charging_subtitle, R.string.design_abrp_subtitle,
             R.string.design_service_subtitle, R.string.design_wifi_subtitle, R.string.design_log_subtitle
     };
 
@@ -85,6 +85,8 @@ public class MainActivity extends AppCompatActivity {
     private View servicePane;
     private View logPane;
     private View vehiclePane;
+    private View consumptionPane;
+    private View chargingPane;
     private View wifiPane;
 
     /** The five pages in navigation order. Parallel to {@link #TAB_IDS}. */
@@ -103,8 +105,18 @@ public class MainActivity extends AppCompatActivity {
      */
     private EnergyTelemetryReader vehicleReader;
     private TextView vehSoc, vehRange, vehPower, vehSpeed, vehOdometer,
-            vehCharging, vehExtTemp, vehHvac, vehSoe,
+            vehCharging, vehHvac, vehSoe,
             vehTireFl, vehTireFr, vehTireRl, vehTireRr;
+    private ConsumptionTracker consumptionTracker;
+    private Spinner consumptionPeriod;
+    private TextView consumptionDistance, consumptionEnergy, consumptionAverage,
+            consumptionSpeed, consumptionTime, consumptionSoc;
+    private Button consumptionReset;
+    private TextView chargeStatus, chargeSoc, chargeVoltage, chargeCurrent, chargePower,
+            chargeEnergy, chargeDuration;
+    private ChargingGraphView chargeGraph;
+    private long chargeStartMs, lastChargeMs;
+    private double chargedKwh;
 
     /**
      * Inflates a page with no parent, then gives it the MATCH_PARENT/MATCH_PARENT layout
@@ -181,6 +193,7 @@ public class MainActivity extends AppCompatActivity {
             refreshStatus();
             refreshCallLog();
             refreshVehicle();
+            refreshConsumption();
             refreshWifi();
             uiHandler.postDelayed(this, 2_000L);
         }
@@ -219,11 +232,15 @@ public class MainActivity extends AppCompatActivity {
         abrpPane    = inflatePane(R.layout.pane_abrp);
         servicePane = inflatePane(R.layout.pane_service);
         vehiclePane   = inflatePane(R.layout.pane_vehicle);
+        consumptionPane = inflatePane(R.layout.pane_consumption);
+        chargingPane = inflatePane(R.layout.pane_charging);
         wifiPane    = inflatePane(R.layout.pane_wifi);
         logPane     = inflatePane(R.layout.pane_log);
-        panes = new View[] { vehiclePane, abrpPane, servicePane, wifiPane, logPane };
+        panes = new View[] { vehiclePane, consumptionPane, chargingPane, abrpPane, servicePane, wifiPane, logPane };
 
         bindVehiclePane();
+        bindConsumptionPane();
+        bindChargingPane();
         bindWifiPane();
 
         apiKeyLayout        = abrpPane.findViewById(R.id.api_key_layout);
@@ -761,7 +778,6 @@ public class MainActivity extends AppCompatActivity {
         vehSpeed     = vehiclePane.findViewById(R.id.vehicle_speed);
         vehOdometer  = vehiclePane.findViewById(R.id.vehicle_odometer);
         vehCharging  = vehiclePane.findViewById(R.id.vehicle_charging);
-        vehExtTemp   = vehiclePane.findViewById(R.id.vehicle_ext_temp);
         vehHvac      = vehiclePane.findViewById(R.id.vehicle_hvac);
         vehSoe       = vehiclePane.findViewById(R.id.vehicle_soe);
         vehTireFl    = vehiclePane.findViewById(R.id.vehicle_tire_fl);
@@ -784,13 +800,14 @@ public class MainActivity extends AppCompatActivity {
             }
             // The timestamp is passed explicitly: its Kotlin default is not visible from Java.
             EnergySnapshot s = vehicleReader.read(System.currentTimeMillis());
+            ConsumptionTracker.get(this).sample(s);
+            refreshCharging(s);
 
             vehSoc.setText(fmt(s.getSocPercent(), "%.0f %%"));
             vehRange.setText(fmt(s.getRangeKm(), "%.0f km"));
             vehPower.setText(fmt(s.getBatteryPowerKw(), "%.1f kW"));
             vehSpeed.setText(fmt(s.getSpeedKmh(), "%.0f km/h"));
             vehOdometer.setText(fmt(s.getOdometerKm(), "%.0f km"));
-            vehExtTemp.setText(fmt(s.getOutsideTempCelsius(), "%.0f °C"));
             vehHvac.setText(fmt(s.getClimate().getDriverTargetCelsius(), "%.0f °C"));
             vehSoe.setText(fmt(s.getBatteryEnergyKwh(), "%.1f kWh"));
 
@@ -803,6 +820,94 @@ public class MainActivity extends AppCompatActivity {
         } catch (Throwable ignored) {
             // Leave the last good reading on screen.
         }
+    }
+
+    private void bindConsumptionPane() {
+        consumptionTracker = ConsumptionTracker.get(this);
+        consumptionPeriod = consumptionPane.findViewById(R.id.consumption_period);
+        String[] periods = {"Başlangıçtan itibaren", "Motor çalıştıktan itibaren",
+                "Tüm zamanlar", "Trip A", "Trip B"};
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, periods);
+        consumptionPeriod.setAdapter(adapter);
+        consumptionDistance = consumptionPane.findViewById(R.id.consumption_distance);
+        consumptionEnergy = consumptionPane.findViewById(R.id.consumption_energy);
+        consumptionAverage = consumptionPane.findViewById(R.id.consumption_average);
+        consumptionSpeed = consumptionPane.findViewById(R.id.consumption_speed);
+        consumptionTime = consumptionPane.findViewById(R.id.consumption_time);
+        consumptionSoc = consumptionPane.findViewById(R.id.consumption_soc);
+        consumptionReset = consumptionPane.findViewById(R.id.consumption_reset);
+        consumptionPeriod.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> p, View v, int position, long id) {
+                consumptionReset.setVisibility(position >= 3 ? View.VISIBLE : View.GONE);
+                refreshConsumption();
+            }
+            @Override public void onNothingSelected(AdapterView<?> p) {}
+        });
+        consumptionReset.setOnClickListener(v -> {
+            int selected = consumptionPeriod.getSelectedItemPosition();
+            if (selected < 3) return;
+            String name = selected == 3 ? "Trip A" : "Trip B";
+            new MaterialAlertDialogBuilder(this).setTitle(name + " sıfırlansın mı?")
+                    .setMessage("Bu sayacın kayıtlı tüketim geçmişi kalıcı olarak silinir.")
+                    .setNegativeButton("Vazgeç", null)
+                    .setPositiveButton("Sıfırla", (d, w) -> {
+                        consumptionTracker.reset(selected == 3
+                                ? ConsumptionTracker.Period.TRIP_A : ConsumptionTracker.Period.TRIP_B);
+                        refreshConsumption();
+                    }).show();
+        });
+    }
+
+    private void bindChargingPane() {
+        chargeStatus = chargingPane.findViewById(R.id.charge_status);
+        chargeSoc = chargingPane.findViewById(R.id.charge_soc);
+        chargeVoltage = chargingPane.findViewById(R.id.charge_voltage);
+        chargeCurrent = chargingPane.findViewById(R.id.charge_current);
+        chargePower = chargingPane.findViewById(R.id.charge_power);
+        chargeEnergy = chargingPane.findViewById(R.id.charge_energy);
+        chargeDuration = chargingPane.findViewById(R.id.charge_duration);
+        chargeGraph = chargingPane.findViewById(R.id.charge_graph);
+    }
+
+    private void refreshCharging(EnergySnapshot s) {
+        if (chargeStatus == null) return;
+        Integer code = s.getChargingStatus();
+        boolean charging = (code != null && (code == 1 || code == 10)) ||
+                (Boolean.TRUE.equals(s.getChargePortConnected()) && s.getBatteryPowerKw() != null
+                        && s.getBatteryPowerKw() < -0.2f);
+        long now = s.getTimestampMs();
+        if (charging && chargeStartMs == 0) { chargeStartMs = now; chargedKwh = 0; }
+        if (!charging) { chargeStartMs = 0; lastChargeMs = 0; chargedKwh = 0; }
+        if (charging && lastChargeMs > 0 && s.getBatteryPowerKw() != null)
+            chargedKwh += Math.max(0, -s.getBatteryPowerKw()) * (now-lastChargeMs) / 3_600_000d;
+        if (charging) lastChargeMs = now;
+        chargeStatus.setText(charging ? (code != null && code == 10 ? "DC hızlı şarj" : "AC şarj") : "Şarj yok");
+        chargeSoc.setText(fmt(s.getSocPercent(), "%.1f %%"));
+        chargeVoltage.setText(fmt(s.getBatteryVoltageV(), "%.1f V"));
+        chargeCurrent.setText(fmt(s.getBatteryCurrentA(), "%.1f A"));
+        chargePower.setText(s.getBatteryPowerKw() == null ? "—" : String.format(java.util.Locale.getDefault(), "%.1f kW", Math.abs(s.getBatteryPowerKw())));
+        chargeEnergy.setText(charging ? String.format(java.util.Locale.getDefault(), "%.2f kWh", chargedKwh) : "—");
+        long sec = chargeStartMs == 0 ? 0 : (now-chargeStartMs)/1000;
+        chargeDuration.setText(charging ? String.format(java.util.Locale.getDefault(), "%02d:%02d:%02d", sec/3600,(sec%3600)/60,sec%60) : "—");
+        if (charging) chargeGraph.add(s.getSocPercent(), s.getBatteryPowerKw());
+    }
+
+    private void refreshConsumption() {
+        if (consumptionTracker == null || consumptionPeriod == null) return;
+        ConsumptionTracker.Period period = ConsumptionTracker.Period.values()[
+                Math.max(0, consumptionPeriod.getSelectedItemPosition())];
+        ConsumptionTracker.Totals t = consumptionTracker.totals(period);
+        consumptionDistance.setText(String.format(java.util.Locale.getDefault(), "%.1f km", t.km));
+        consumptionEnergy.setText(String.format(java.util.Locale.getDefault(), "%.2f kWh", t.kwh));
+        consumptionAverage.setText(t.km < 0.1 ? "—" : String.format(java.util.Locale.getDefault(),
+                "%.1f kWh/100 km", t.kwh * 100d / t.km));
+        consumptionSpeed.setText(t.hours <= 0 ? "—" : String.format(java.util.Locale.getDefault(),
+                "%.1f km/h", t.km / t.hours));
+        long minutes = Math.round(t.hours * 60d);
+        consumptionTime.setText(String.format(java.util.Locale.getDefault(), "%d sa %02d dk",
+                minutes / 60, minutes % 60));
+        consumptionSoc.setText(String.format(java.util.Locale.getDefault(), "%.1f %%", t.soc));
     }
 
     /**

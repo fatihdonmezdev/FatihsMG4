@@ -129,6 +129,7 @@ public class AbrpUploadService extends Service {
     private volatile Location lastLocation;
 
     private EnergyTelemetryReader energyReader;
+    private ConsumptionTracker consumptionTracker;
     /**
      * Keeps the unit on the phone hotspot without a trip into Settings. Attempted on the
      * upload tick because that is exactly when being offline costs something, and it is
@@ -194,13 +195,12 @@ public class AbrpUploadService extends Service {
 
         // One shared, firmware-aware EVHardware snapshot owns every vehicle signal.
         energyReader = new EnergyTelemetryReader(getApplicationContext());
+        consumptionTracker = ConsumptionTracker.get(this);
         wifi = new WifiAutoConnect(getApplicationContext());
         // The head unit's own weather service, bound for one reason: ENV_OUTSIDE_TEMPERATURE
         // is not implemented on this vehicle, so the car cannot say how warm it is outside
         // and something else has to. Idempotent, asynchronous, and absent on a car that does
         // not have the map stack — in which case ext_temp simply stays unreported.
-        SaicWeather.INSTANCE.connect(getApplicationContext());
-        registerWeatherReceiver();
 
         requestLocationUpdates();
 
@@ -267,6 +267,7 @@ public class AbrpUploadService extends Service {
     public void onDestroy() {
         Log.i(TAG, "Service stopping");
         if (scheduler != null) scheduler.shutdownNow();
+        if (consumptionTracker != null) consumptionTracker.persist();
         if (locationManager != null) {
             try { locationManager.removeUpdates(locationListener); } catch (Exception ignored) {}
         }
@@ -318,6 +319,10 @@ public class AbrpUploadService extends Service {
     }
 
     private void doUpload() {
+        long sampleMs = System.currentTimeMillis();
+        EnergySnapshot vehicle = energyReader.read(sampleMs);
+        consumptionTracker.sample(vehicle);
+
         String token  = securePrefs.getString(SecurePrefs.KEY_TOKEN,   "").trim();
         String apiKey = securePrefs.getString(SecurePrefs.KEY_API_KEY, "").trim();
 
@@ -332,15 +337,12 @@ public class AbrpUploadService extends Service {
 
         // Read whatever the car will give us. Every getter returns null when the read
         // fails, and a null field is omitted from the payload — never sent as 0.
-        long sampleMs = System.currentTimeMillis();
-        EnergySnapshot vehicle = energyReader.read(sampleMs);
         boolean carUp = vehicle.getHasVehicleData();
         Float speedKmh = vehicle.getSpeedKmh();
         Integer soc = vehicle.getSocPercent() == null
                 ? null : Math.round(vehicle.getSocPercent());
         Integer rangeKm = vehicle.getRangeKm() == null
                 ? null : Math.round(vehicle.getRangeKm());
-        Float extTemp = vehicle.getOutsideTempCelsius();
         Float powerKw = vehicle.getBatteryPowerKw();
         Float chargeRateKw = powerKw == null ? null : -powerKw;
         Boolean portConnected = vehicle.getChargePortConnected();
@@ -393,40 +395,10 @@ public class AbrpUploadService extends Service {
         // ENV_OUTSIDE_TEMPERATURE, so there is no vehicle reading to correct. The head unit's
         // weather service answers for a position, and ambient air at the car is what ext_temp
         // means — a better figure than a bumper sensor in the sun would give anyway.
-        String tempSource = "car";
-        SaicWeather.Reading sky = null;
-        if (!TelemetryPayload.isPlausibleTemp(extTemp)) {
-            // The broadcast first. It is what fills the head unit's own status bar, so on this
-            // car it is the source known to be producing a number, where the map service's
-            // query never even bound.
-            // The broadcast arrives when the weather app feels like it, so a reading that
-            // never came is retried here rather than only at start-up.
-            if (headUnitWeather.temperatureC() == null) probeStickyWeather();
-            Float broadcast = weatherIsFresh() ? headUnitWeather.temperatureC() : null;
-            if (TelemetryPayload.isPlausibleTemp(broadcast)) {
-                extTemp = broadcast;
-                tempSource = "bcast:" + headUnitWeather.diagnostic();
-            } else {
-                sky = weatherAt(loc);
-                if (sky != null && sky.getTemperatureCelsius() != null) {
-                    extTemp = sky.getTemperatureCelsius().floatValue();
-                    tempSource = "map:" + sky.getCity();
-                } else {
-                    // Neither answered. Which one failed, and how, is the difference between
-                    // "the broadcast never arrives" and "it arrives in a shape this cannot
-                    // read" — and nothing on the ABRP side tells them apart.
-                    tempSource = "none bcast=" + headUnitWeather.diagnostic()
-                            + " map=" + (SaicWeather.INSTANCE.isAvailable() ? "bound" : "unbound")
-                            + (lastQueryMs < 0 ? "" : "/" + lastQueryMs + "ms");
-                }
-            }
-        }
-
         TelemetryPayload tlm = new TelemetryPayload(System.currentTimeMillis() / 1000);
         tlm.soc           = soc;
         tlm.speedKmh      = speedKmh;
         tlm.rangeKm       = rangeKm;
-        tlm.extTemp       = extTemp;
         tlm.powerKw       = powerKw;
         tlm.charging      = charging;
         tlm.dcfc          = dcfc;
@@ -450,7 +422,7 @@ public class AbrpUploadService extends Service {
         }
 
         String tlmJson = tlm.build();
-        String summary = TelemetryPayload.summarize(tlmJson) + " [temp " + tempSource + "]";
+        String summary = TelemetryPayload.summarize(tlmJson);
         if (loc != null) {
             summary += " (fix " + locationAgeMs(loc) / 1000 + "s old"
                     + " +/-" + (loc.hasAccuracy() ? Math.round(loc.getAccuracy()) + "m" : "?")
@@ -458,7 +430,6 @@ public class AbrpUploadService extends Service {
             // The weather service names the place it answered for. ABRP shows an address it
             // reverse-geocodes from the same coordinates, so the two disagreeing says the
             // coordinates are wrong, and the two agreeing says ABRP is showing something old.
-            if (sky != null && !sky.getCity().isEmpty()) summary += ", near " + sky.getCity();
             summary += ")";
         }
         // What actually went on the wire. Kept on the log entry as well as in logcat: the

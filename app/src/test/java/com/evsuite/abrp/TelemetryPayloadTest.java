@@ -21,7 +21,6 @@ public class TelemetryPayloadTest {
         t.soc       = 63;
         t.speedKmh  = 48.4f;
         t.rangeKm   = 210;
-        t.extTemp   = 12f;
         t.powerKw   = -14.5f;
         t.charging  = false;
         t.dcfc      = false;
@@ -46,7 +45,7 @@ public class TelemetryPayloadTest {
     public void unreadablePropertiesAreOmittedNotZeroed() {
         String json = noCar();
         for (String field : new String[]{
-                "soc", "speed", "est_battery_range", "ext_temp", "power",
+                "soc", "speed", "est_battery_range", "power",
                 "is_charging", "is_dcfc", "is_parked", "cabin_temp",
                 "batt_temp", "capacity", "odometer", "hvac_setpoint",
                 "tire_pressure_fl", "tire_pressure_fr",
@@ -84,7 +83,6 @@ public class TelemetryPayloadTest {
         assertEquals(63, json.getInt("soc"));
         assertEquals(48, json.getInt("speed"));               // rounded
         assertEquals(210, json.getInt("est_battery_range"));
-        assertEquals(12, json.getInt("ext_temp"));
         assertEquals(-14.5, json.getDouble("power"), 0.001);
         assertEquals(0, json.getInt("is_charging"));
         assertEquals(0, json.getInt("is_dcfc"));
@@ -297,26 +295,9 @@ public class TelemetryPayloadTest {
     }
 
     @Test
-    public void unimplementedOutsideTempIsOmittedNotSentAsZero() {
-        // A VHAL without ENV_OUTSIDE_TEMPERATURE answers 0.0. Sent as ext_temp:0 it is a
-        // freezing day as far as ABRP's consumption model is concerned.
-        TelemetryPayload t = fullCar();
-        t.extTemp = 0f;
-        assertFalse(t.build().contains("ext_temp"));
-    }
-
-    @Test
-    public void impossibleOutsideTempIsOmitted() {
-        TelemetryPayload t = fullCar();
-        t.extTemp = -273f;
-        assertFalse(t.build().contains("ext_temp"));
-    }
-
-    @Test
     public void summaryListsSentValuesAndOmittedFields() {
         String summary = TelemetryPayload.summarize(fullCar().build());
         assertTrue(summary, summary.contains("soc=63"));
-        assertTrue(summary, summary.contains("ext_temp=12"));
         assertTrue(summary, summary.contains("cabin_temp=22"));
         // Nothing gave us a position, so lat/lon must show up as omitted, not as 0.
         assertFalse(summary, summary.contains("lat="));

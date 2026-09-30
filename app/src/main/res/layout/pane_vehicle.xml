@@ -9,10 +9,6 @@
                     <TextView android:id="@+id/vehicle_odometer" style="@style/DataValue" />
                 </TableRow>
                 <TableRow style="@style/DataRow" android:minHeight="40dp" android:paddingTop="8dp" android:paddingBottom="8dp">
-                    <TextView style="@style/DataLabel" android:text="@string/vehicle_row_ext_temp" />
-                    <TextView android:id="@+id/vehicle_ext_temp" style="@style/DataValue" />
-                </TableRow>
-                <TableRow style="@style/DataRow" android:minHeight="40dp" android:paddingTop="8dp" android:paddingBottom="8dp">
                     <TextView style="@style/DataLabel" android:text="@string/vehicle_row_hvac" />
                     <TextView android:id="@+id/vehicle_hvac" style="@style/DataValue" />
                 </TableRow>

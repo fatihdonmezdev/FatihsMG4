@@ -31,6 +31,8 @@ data class EnergySnapshot(
     val parked: Boolean?,
     val climate: ClimateSnapshot,
     val tirePressures: TirePressureSnapshot,
+    val batteryVoltageV: Float? = null,
+    val batteryCurrentA: Float? = null,
 ) {
     val hasVehicleData: Boolean
         get() = socPercent != null || rangeKm != null || speedKmh != null ||

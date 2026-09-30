@@ -584,6 +584,21 @@ object EVHardware {
         return volts * amps / 1_000f
     }
 
+    /** Raw pack voltage/current used by the OEM charging screen; read-only, SWI68/69. */
+    fun getVendorBatteryVoltageV(): Float? {
+        val gen = FirmwareInfo.getGeneration()
+        if (gen != FirmwareInfo.Gen.SWI68 && gen != FirmwareInfo.Gen.SWI69) return null
+        return getFloatPropertyCPM(PROP_BMS_PACK_VOLT_SWI68, AREA_GLOBAL)
+            ?.takeIf { it.isFinite() && it in PACK_VOLTAGE_RANGE }
+    }
+
+    fun getVendorBatteryCurrentA(): Float? {
+        val gen = FirmwareInfo.getGeneration()
+        if (gen != FirmwareInfo.Gen.SWI68 && gen != FirmwareInfo.Gen.SWI69) return null
+        return getFloatPropertyCPM(PROP_BMS_PACK_CURRENT_SWI68, AREA_GLOBAL)
+            ?.takeIf { it.isFinite() && kotlin.math.abs(it) <= MAX_PACK_CURRENT_A }
+    }
+
     /** Vendor range fallback; SWI68 and SWI69 both publish it on the same id. */
     fun getVendorRangeKm(): Int? =
         if (FirmwareInfo.getGeneration() == FirmwareInfo.Gen.SWI68 ||

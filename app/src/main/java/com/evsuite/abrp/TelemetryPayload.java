@@ -35,7 +35,6 @@ final class TelemetryPayload {
 
     // --- Lower priority ---
     Integer rangeKm;         // km, vehicle's own estimate
-    Float   extTemp;         // °C, outside
     Float   cabinTemp;       // °C
     Float   battTempC;       // °C, traction battery
     Float   capacityKwh;     // kWh, usable pack capacity
@@ -63,13 +62,6 @@ final class TelemetryPayload {
             putIfPresent(tlm, "soc", soc);
             putIfPresent(tlm, "speed", speedKmh == null ? null : Math.round(speedKmh));
             putIfPresent(tlm, "est_battery_range", rangeKm);
-            // Outside temp gets the same plausibility guard as the other temperatures:
-            // a VHAL that does not implement ENV_OUTSIDE_TEMPERATURE answers 0.0, and
-            // ABRP treats "0 °C outside" as a real reading that costs range in its plan.
-            // A genuine 0 °C is lost with it, which is the cheaper of the two errors.
-            if (isPlausibleTemp(extTemp)) {
-                tlm.put("ext_temp", Math.round(extTemp));
-            }
             if (powerKw != null) tlm.put("power", round2(powerKw));
             putIfPresent(tlm, "is_charging", boolToInt(charging));
             putIfPresent(tlm, "is_dcfc", boolToInt(dcfc));
@@ -169,7 +161,7 @@ final class TelemetryPayload {
      * Used only to work out what was left out — see {@link #summarize(String)}.
      */
     private static final String[] ALL_FIELDS = {
-            "utc", "soc", "speed", "power", "est_battery_range", "ext_temp", "cabin_temp",
+            "utc", "soc", "speed", "power", "est_battery_range", "cabin_temp",
             "batt_temp", "hvac_setpoint", "capacity", "soe", "kwh_charged", "odometer",
             "is_charging", "is_dcfc", "is_parked", "lat", "lon", "elevation", "heading",
             "tire_pressure_fl", "tire_pressure_fr", "tire_pressure_rl", "tire_pressure_rr",

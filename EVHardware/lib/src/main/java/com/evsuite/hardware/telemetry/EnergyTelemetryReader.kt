@@ -26,6 +26,8 @@ interface EnergySignalSource {
     fun vehicleConsumedKwh(): Float? = null
     fun vehicleRegeneratedKwh(): Float? = null
     fun parked(): Boolean?
+    fun batteryVoltageV(): Float? = null
+    fun batteryCurrentA(): Float? = null
     fun climate(): ClimateSnapshot
     fun tirePressures(): TirePressureSnapshot
     /** Probe-only values excluded from [EnergySnapshot] and normal consumers. */
@@ -66,6 +68,8 @@ class EvHardwareEnergySignalSource(context: Context) : EnergySignalSource {
     override fun vehicleConsumedKwh() = SaicCharging.consumedKwhSinceCharge()
     override fun vehicleRegeneratedKwh() = SaicCharging.regeneratedKwhSinceCharge()
     override fun parked() = EVHardware.isVehicleInPark()
+    override fun batteryVoltageV() = EVHardware.getVendorBatteryVoltageV()
+    override fun batteryCurrentA() = EVHardware.getVendorBatteryCurrentA()
     override fun tirePressures() = TirePressureSnapshot(
         frontLeftKpa = EVHardware.getTirePressureKpa(EVHardware.Wheel.FRONT_LEFT),
         frontRightKpa = EVHardware.getTirePressureKpa(EVHardware.Wheel.FRONT_RIGHT),
@@ -122,6 +126,8 @@ class EnergyTelemetryReader(private val source: EnergySignalSource) {
         parked = source.parked(),
         climate = source.climate(),
         tirePressures = source.tirePressures(),
+        batteryVoltageV = source.batteryVoltageV()?.takeIf { it.isFinite() },
+        batteryCurrentA = source.batteryCurrentA()?.takeIf { it.isFinite() },
     )
 
     /** Reads CP-004 candidates only when an unstable evidence capture explicitly requests them. */

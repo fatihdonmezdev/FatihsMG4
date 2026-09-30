@@ -5,6 +5,12 @@
     <string name="tab_abrp">ABRP</string>
     <string name="tab_service">Aktarım</string>
     <string name="tab_vehicle">Genel</string>
+    <string name="tab_consumption">Tüketim</string>
+    <string name="tab_charging">Şarj</string>
+    <string name="consumption_title">Tüketim</string>
+    <string name="consumption_subtitle">Başlangıç, motor, tüm zamanlar ve trip sayaçları</string>
+    <string name="charging_title">Şarj</string>
+    <string name="charging_subtitle">Canlı batarya değerleri ve SOC/güç eğrisi</string>
     <string name="tab_wifi">Wi-Fi</string>
     <string name="tab_log">Kayıtlar</string>
 
@@ -28,7 +34,6 @@
     <string name="vehicle_row_speed">Hız</string>
     <string name="vehicle_row_odometer">Kilometre</string>
     <string name="vehicle_row_batt_temp">Batarya Sıcaklığı</string>
-    <string name="vehicle_row_ext_temp">Dış Sıcaklık</string>
     <string name="vehicle_row_cabin_temp">Kabin Sıcaklığı</string>
     <string name="vehicle_row_hvac">Klima Ayarı</string>
     <string name="vehicle_row_capacity">Batarya Kapasitesi</string>
