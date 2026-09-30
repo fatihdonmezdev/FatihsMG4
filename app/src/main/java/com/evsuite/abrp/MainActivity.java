@@ -108,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
             vehCharging, vehHvac, vehSoe,
             vehTireFl, vehTireFr, vehTireRl, vehTireRr;
     private ConsumptionTracker consumptionTracker;
-    private Spinner consumptionPeriod;
+    private ConsumptionTracker.Period consumptionPeriod = ConsumptionTracker.Period.LIFETIME;
     private TextView consumptionDistance, consumptionEnergy, consumptionAverage,
             consumptionSpeed, consumptionTime, consumptionSoc;
     private Button consumptionReset;
@@ -824,12 +824,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void bindConsumptionPane() {
         consumptionTracker = ConsumptionTracker.get(this);
-        consumptionPeriod = consumptionPane.findViewById(R.id.consumption_period);
-        String[] periods = {"Başlangıçtan itibaren", "Motor çalıştıktan itibaren",
-                "Tüm zamanlar", "Trip A", "Trip B"};
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, periods);
-        consumptionPeriod.setAdapter(adapter);
         consumptionDistance = consumptionPane.findViewById(R.id.consumption_distance);
         consumptionEnergy = consumptionPane.findViewById(R.id.consumption_energy);
         consumptionAverage = consumptionPane.findViewById(R.id.consumption_average);
@@ -837,26 +831,47 @@ public class MainActivity extends AppCompatActivity {
         consumptionTime = consumptionPane.findViewById(R.id.consumption_time);
         consumptionSoc = consumptionPane.findViewById(R.id.consumption_soc);
         consumptionReset = consumptionPane.findViewById(R.id.consumption_reset);
-        consumptionPeriod.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> p, View v, int position, long id) {
-                consumptionReset.setVisibility(position >= 3 ? View.VISIBLE : View.GONE);
-                refreshConsumption();
-            }
-            @Override public void onNothingSelected(AdapterView<?> p) {}
-        });
+        bindPeriodButton(R.id.consumption_lifetime, ConsumptionTracker.Period.LIFETIME);
+        bindPeriodButton(R.id.consumption_start, ConsumptionTracker.Period.START);
+        bindPeriodButton(R.id.consumption_motor, ConsumptionTracker.Period.MOTOR);
+        bindPeriodButton(R.id.consumption_trip_a, ConsumptionTracker.Period.TRIP_A);
+        bindPeriodButton(R.id.consumption_trip_b, ConsumptionTracker.Period.TRIP_B);
+        selectPeriodButton(R.id.consumption_lifetime);
         consumptionReset.setOnClickListener(v -> {
-            int selected = consumptionPeriod.getSelectedItemPosition();
-            if (selected < 3) return;
-            String name = selected == 3 ? "Trip A" : "Trip B";
+            if (consumptionPeriod != ConsumptionTracker.Period.TRIP_A && consumptionPeriod != ConsumptionTracker.Period.TRIP_B) return;
+            String name = consumptionPeriod == ConsumptionTracker.Period.TRIP_A ? "Trip A" : "Trip B";
             new MaterialAlertDialogBuilder(this).setTitle(name + " sıfırlansın mı?")
                     .setMessage("Bu sayacın kayıtlı tüketim geçmişi kalıcı olarak silinir.")
                     .setNegativeButton("Vazgeç", null)
                     .setPositiveButton("Sıfırla", (d, w) -> {
-                        consumptionTracker.reset(selected == 3
-                                ? ConsumptionTracker.Period.TRIP_A : ConsumptionTracker.Period.TRIP_B);
+                        consumptionTracker.reset(consumptionPeriod);
                         refreshConsumption();
                     }).show();
         });
+    }
+
+    private void bindPeriodButton(int id, ConsumptionTracker.Period period) {
+        View button = consumptionPane.findViewById(id);
+        button.setOnClickListener(v -> {
+            selectPeriodButton(id);
+            consumptionPeriod = period;
+            consumptionReset.setVisibility(period == ConsumptionTracker.Period.TRIP_A ||
+                    period == ConsumptionTracker.Period.TRIP_B ? View.VISIBLE : View.GONE);
+            refreshConsumption();
+        });
+    }
+
+    private void selectPeriodButton(int selectedId) {
+        int[] ids = {R.id.consumption_lifetime, R.id.consumption_start,
+                R.id.consumption_motor, R.id.consumption_trip_a, R.id.consumption_trip_b};
+        for (int id : ids) {
+            MaterialButton button = consumptionPane.findViewById(id);
+            boolean selected = id == selectedId;
+            button.setSelected(selected);
+            button.setTextColor(selected ? 0xFFD8C39A : COLOR_PENDING);
+            button.setStrokeColor(android.content.res.ColorStateList.valueOf(
+                    selected ? 0xFFD8C39A : 0xFF3A4143));
+        }
     }
 
     private void bindChargingPane() {
@@ -894,10 +909,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void refreshConsumption() {
-        if (consumptionTracker == null || consumptionPeriod == null) return;
-        ConsumptionTracker.Period period = ConsumptionTracker.Period.values()[
-                Math.max(0, consumptionPeriod.getSelectedItemPosition())];
-        ConsumptionTracker.Totals t = consumptionTracker.totals(period);
+        if (consumptionTracker == null) return;
+        ConsumptionTracker.Totals t = consumptionTracker.totals(consumptionPeriod);
         consumptionDistance.setText(String.format(java.util.Locale.getDefault(), "%.1f km", t.km));
         consumptionEnergy.setText(String.format(java.util.Locale.getDefault(), "%.2f kWh", t.kwh));
         consumptionAverage.setText(t.km < 0.1 ? "—" : String.format(java.util.Locale.getDefault(),
