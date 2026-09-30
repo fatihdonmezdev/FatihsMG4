@@ -105,7 +105,7 @@ public class MainActivity extends AppCompatActivity {
      */
     private EnergyTelemetryReader vehicleReader;
     private TextView vehSoc, vehRange, vehPower, vehSpeed, vehOdometer,
-            vehCharging, vehHvac, vehSoe,
+            vehCharging, vehHvac,
             vehTireFl, vehTireFr, vehTireRl, vehTireRr;
     private ConsumptionTracker consumptionTracker;
     private ConsumptionTracker.Period consumptionPeriod = ConsumptionTracker.Period.LIFETIME;
@@ -779,7 +779,6 @@ public class MainActivity extends AppCompatActivity {
         vehOdometer  = vehiclePane.findViewById(R.id.vehicle_odometer);
         vehCharging  = vehiclePane.findViewById(R.id.vehicle_charging);
         vehHvac      = vehiclePane.findViewById(R.id.vehicle_hvac);
-        vehSoe       = vehiclePane.findViewById(R.id.vehicle_soe);
         vehTireFl    = vehiclePane.findViewById(R.id.vehicle_tire_fl);
         vehTireFr    = vehiclePane.findViewById(R.id.vehicle_tire_fr);
         vehTireRl    = vehiclePane.findViewById(R.id.vehicle_tire_rl);
@@ -809,7 +808,6 @@ public class MainActivity extends AppCompatActivity {
             vehSpeed.setText(fmt(s.getSpeedKmh(), "%.0f km/h"));
             vehOdometer.setText(fmt(s.getOdometerKm(), "%.0f km"));
             vehHvac.setText(fmt(s.getClimate().getDriverTargetCelsius(), "%.0f °C"));
-            vehSoe.setText(fmt(s.getBatteryEnergyKwh(), "%.1f kWh"));
 
             vehCharging.setText(chargingLabel(s));
 

@@ -37,7 +37,6 @@
     <string name="vehicle_row_cabin_temp">Kabin Sıcaklığı</string>
     <string name="vehicle_row_hvac">Klima Ayarı</string>
     <string name="vehicle_row_capacity">Batarya Kapasitesi</string>
-    <string name="vehicle_row_soe">Kalan Enerji</string>
     <string name="vehicle_row_charging">Şarj Durumu</string>
     <string name="vehicle_tire_fl">Ön Sol</string>
     <string name="vehicle_tire_fr">Ön Sağ</string>
