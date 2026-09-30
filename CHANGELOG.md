@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.13] - 2026-09-30
+
+### Changed
+
+- Published a follow-up build to verify the interactive installer fallback over OTA.
+
 ## [2.2.12] - 2026-09-30
 
 ### Fixed
