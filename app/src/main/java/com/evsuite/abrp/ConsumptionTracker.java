@@ -29,7 +29,7 @@ final class ConsumptionTracker {
     private final SharedPreferences prefs;
     private Totals lifetime, tripA, tripB;
     private long lastMs;
-    private Float lastSpeed, lastPower, lastSoc;
+    private Float lastSpeed, lastPower, lastSoc, lastVehicleConsumedKwh;
 
     private ConsumptionTracker(Context context) {
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -39,6 +39,7 @@ final class ConsumptionTracker {
 
     synchronized void sample(EnergySnapshot s) {
         migrateSwi69DistanceScale(s.getFirmware());
+        migrateConsumptionMethodV2(s.getFirmware());
         long now = s.getTimestampMs();
         if (lastMs > 0 && now > lastMs) {
             double hours = (now - lastMs) / 3_600_000d;
@@ -48,8 +49,19 @@ final class ConsumptionTracker {
                 Float power = s.getBatteryPowerKw();
                 double km = speed == null ? 0d : Math.max(0d,
                         ((lastSpeed == null ? speed : lastSpeed) + speed) * 0.5d) * hours;
-                double kwh = power == null ? 0d :
-                        ((lastPower == null ? power : lastPower) + power) * 0.5d * hours;
+                Float vehicleConsumed = s.getVehicleConsumedKwh();
+                double kwh;
+                if (vehicleConsumed != null && lastVehicleConsumedKwh != null
+                        && vehicleConsumed >= lastVehicleConsumedKwh
+                        && vehicleConsumed - lastVehicleConsumedKwh <= 5f) {
+                    kwh = vehicleConsumed - lastVehicleConsumedKwh;
+                } else {
+                    // Gross draw fallback: regeneration/charging must not make consumption
+                    // look artificially low when the OEM cumulative counter is unavailable.
+                    double effectiveKw = power == null ? 0d
+                            : ((lastPower == null ? power : lastPower) + power) * 0.5d;
+                    kwh = Math.max(0d, effectiveKw) * hours;
+                }
                 double dsoc = (lastSoc == null || s.getSocPercent() == null ||
                         Boolean.TRUE.equals(s.getChargePortConnected())) ? 0d : lastSoc - s.getSocPercent();
                 lifetime = add(lifetime, km, kwh, hours, dsoc);
@@ -65,6 +77,7 @@ final class ConsumptionTracker {
         }
         lastMs = now; lastSpeed = s.getSpeedKmh(); lastPower = s.getBatteryPowerKw();
         lastSoc = s.getSocPercent();
+        lastVehicleConsumedKwh = s.getVehicleConsumedKwh();
     }
 
     synchronized Totals totals(Period period) {
@@ -143,6 +156,20 @@ final class ConsumptionTracker {
         }
         editor.putBoolean("swi69_distance_v2", true).commit();
         lifetime = load("life"); tripA = load("a"); tripB = load("b");
+    }
+
+    /** Old net-power energy cannot be repaired exactly; discard it once before OEM deltas. */
+    private void migrateConsumptionMethodV2(FirmwareInfo.Gen firmware) {
+        if (firmware != FirmwareInfo.Gen.SWI69 || prefs.getBoolean("consumption_energy_v2", false)) return;
+        SharedPreferences.Editor editor = prefs.edit();
+        for (String key : prefs.getAll().keySet()) {
+            if (key.startsWith("day_") || key.startsWith("life_")
+                    || key.startsWith("a_") || key.startsWith("b_")) editor.remove(key);
+        }
+        editor.putBoolean("consumption_energy_v2", true).commit();
+        lifetime = zero(); tripA = zero(); tripB = zero();
+        lastMs = 0; lastSpeed = null; lastPower = null; lastSoc = null;
+        lastVehicleConsumedKwh = null;
     }
 
     private Totals load(String key) { return new Totals(bits(key,"km"), bits(key,"kwh"), bits(key,"h"), bits(key,"soc")); }
