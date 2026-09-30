@@ -39,7 +39,6 @@ final class ConsumptionTracker {
 
     synchronized void sample(EnergySnapshot s) {
         migrateSwi69DistanceScale(s.getFirmware());
-        migrateConsumptionMethodV2(s.getFirmware());
         long now = s.getTimestampMs();
         if (lastMs > 0 && now > lastMs) {
             double hours = (now - lastMs) / 3_600_000d;
@@ -158,19 +157,6 @@ final class ConsumptionTracker {
         lifetime = load("life"); tripA = load("a"); tripB = load("b");
     }
 
-    /** Old net-power energy cannot be repaired exactly; discard it once before OEM deltas. */
-    private void migrateConsumptionMethodV2(FirmwareInfo.Gen firmware) {
-        if (firmware != FirmwareInfo.Gen.SWI69 || prefs.getBoolean("consumption_energy_v2", false)) return;
-        SharedPreferences.Editor editor = prefs.edit();
-        for (String key : prefs.getAll().keySet()) {
-            if (key.startsWith("day_") || key.startsWith("life_")
-                    || key.startsWith("a_") || key.startsWith("b_")) editor.remove(key);
-        }
-        editor.putBoolean("consumption_energy_v2", true).commit();
-        lifetime = zero(); tripA = zero(); tripB = zero();
-        lastMs = 0; lastSpeed = null; lastPower = null; lastSoc = null;
-        lastVehicleConsumedKwh = null;
-    }
 
     private Totals load(String key) { return new Totals(bits(key,"km"), bits(key,"kwh"), bits(key,"h"), bits(key,"soc")); }
     private double bits(String key, String field) { return Double.longBitsToDouble(prefs.getLong(key + "_" + field, 0L)); }
