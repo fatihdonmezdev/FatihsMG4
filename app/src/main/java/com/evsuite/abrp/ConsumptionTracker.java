@@ -5,9 +5,14 @@ import android.content.SharedPreferences;
 
 import com.evsuite.hardware.telemetry.EnergySnapshot;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.WeekFields;
+
 /** Persistent, read-only trip/lifetime integration patterned after DriveHub_Dort. */
 final class ConsumptionTracker {
-    enum Period { START, MOTOR, LIFETIME, TRIP_A, TRIP_B }
+    enum Period { LIFETIME, WEEK, MONTH, TRIP_A, TRIP_B }
 
     static final class Totals {
         final double km, kwh, hours, soc;
@@ -24,20 +29,23 @@ final class ConsumptionTracker {
     }
 
     private final SharedPreferences prefs;
-    private Totals start = zero(), motor = zero(), lifetime, tripA, tripB;
+    private Totals lifetime, week, month, tripA, tripB;
+    private String weekId, monthId;
     private long lastMs;
     private Float lastSpeed, lastPower, lastSoc;
-    private Boolean lastParked;
 
     private ConsumptionTracker(Context context) {
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        lifetime = load("life"); tripA = load("a"); tripB = load("b");
+        lifetime = load("life"); week = load("week"); month = load("month");
+        tripA = load("a"); tripB = load("b");
+        weekId = prefs.getString("week_id", "");
+        monthId = prefs.getString("month_id", "");
+        rollPeriods(System.currentTimeMillis());
     }
 
     synchronized void sample(EnergySnapshot s) {
         long now = s.getTimestampMs();
-        Boolean parked = s.getParked();
-        if (Boolean.FALSE.equals(parked) && !Boolean.FALSE.equals(lastParked)) motor = zero();
+        rollPeriods(now);
         if (lastMs > 0 && now > lastMs) {
             double hours = (now - lastMs) / 3_600_000d;
             // Never bridge a process pause/sleep into invented driving data.
@@ -50,21 +58,21 @@ final class ConsumptionTracker {
                         ((lastPower == null ? power : lastPower) + power) * 0.5d * hours;
                 double dsoc = (lastSoc == null || s.getSocPercent() == null ||
                         Boolean.TRUE.equals(s.getChargePortConnected())) ? 0d : lastSoc - s.getSocPercent();
-                start = add(start, km, kwh, hours, dsoc);
                 lifetime = add(lifetime, km, kwh, hours, dsoc);
+                week = add(week, km, kwh, hours, dsoc);
+                month = add(month, km, kwh, hours, dsoc);
                 tripA = add(tripA, km, kwh, hours, dsoc);
                 tripB = add(tripB, km, kwh, hours, dsoc);
-                if (Boolean.FALSE.equals(parked)) motor = add(motor, km, kwh, hours, dsoc);
                 persist();
             }
         }
         lastMs = now; lastSpeed = s.getSpeedKmh(); lastPower = s.getBatteryPowerKw();
-        lastSoc = s.getSocPercent(); lastParked = parked;
+        lastSoc = s.getSocPercent();
     }
 
     synchronized Totals totals(Period period) {
         switch (period) {
-            case START: return start; case MOTOR: return motor; case TRIP_A: return tripA;
+            case WEEK: return week; case MONTH: return month; case TRIP_A: return tripA;
             case TRIP_B: return tripB; default: return lifetime;
         }
     }
@@ -78,8 +86,21 @@ final class ConsumptionTracker {
 
     synchronized void persist() {
         SharedPreferences.Editor e = prefs.edit();
-        save(e, "life", lifetime); save(e, "a", tripA); save(e, "b", tripB);
+        save(e, "life", lifetime); save(e, "week", week); save(e, "month", month);
+        save(e, "a", tripA); save(e, "b", tripB);
+        e.putString("week_id", weekId).putString("month_id", monthId);
         e.commit();
+    }
+
+    private void rollPeriods(long nowMs) {
+        LocalDate date = Instant.ofEpochMilli(nowMs).atZone(ZoneId.systemDefault()).toLocalDate();
+        WeekFields iso = WeekFields.ISO;
+        String currentWeek = date.get(iso.weekBasedYear()) + "-W" + date.get(iso.weekOfWeekBasedYear());
+        String currentMonth = date.getYear() + "-" + date.getMonthValue();
+        boolean changed = false;
+        if (!currentWeek.equals(weekId)) { weekId = currentWeek; week = zero(); changed = true; }
+        if (!currentMonth.equals(monthId)) { monthId = currentMonth; month = zero(); changed = true; }
+        if (changed) persist();
     }
 
     private Totals load(String key) { return new Totals(bits(key,"km"), bits(key,"kwh"), bits(key,"h"), bits(key,"soc")); }

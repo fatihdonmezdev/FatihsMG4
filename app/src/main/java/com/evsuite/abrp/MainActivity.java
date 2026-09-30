@@ -830,8 +830,8 @@ public class MainActivity extends AppCompatActivity {
         consumptionSoc = consumptionPane.findViewById(R.id.consumption_soc);
         consumptionReset = consumptionPane.findViewById(R.id.consumption_reset);
         bindPeriodButton(R.id.consumption_lifetime, ConsumptionTracker.Period.LIFETIME);
-        bindPeriodButton(R.id.consumption_start, ConsumptionTracker.Period.START);
-        bindPeriodButton(R.id.consumption_motor, ConsumptionTracker.Period.MOTOR);
+        bindPeriodButton(R.id.consumption_week, ConsumptionTracker.Period.WEEK);
+        bindPeriodButton(R.id.consumption_month, ConsumptionTracker.Period.MONTH);
         bindPeriodButton(R.id.consumption_trip_a, ConsumptionTracker.Period.TRIP_A);
         bindPeriodButton(R.id.consumption_trip_b, ConsumptionTracker.Period.TRIP_B);
         selectPeriodButton(R.id.consumption_lifetime);
@@ -860,8 +860,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void selectPeriodButton(int selectedId) {
-        int[] ids = {R.id.consumption_lifetime, R.id.consumption_start,
-                R.id.consumption_motor, R.id.consumption_trip_a, R.id.consumption_trip_b};
+        int[] ids = {R.id.consumption_lifetime, R.id.consumption_week,
+                R.id.consumption_month, R.id.consumption_trip_a, R.id.consumption_trip_b};
         for (int id : ids) {
             MaterialButton button = consumptionPane.findViewById(id);
             boolean selected = id == selectedId;
