@@ -36,7 +36,7 @@ release is a candidate only if all of these hold:
 | Asset name ends `-<version>.apk` | `ASSET_VERSION` regex | No version, asset ignored |
 | Version strictly higher than installed | `isNewer()` | Nothing to do, reports "Güncel" |
 | Download host on the allowlist | `isAllowedUrl()` | Refused and logged |
-| APK signed with the **same certificate** as the running app | `signatureMatchesRunningApp()` | Deleted, never installed |
+| APK signed with the **same certificate** as the running app | Android `PackageInstaller` | Installation is rejected by the platform |
 | Matching `.sha256` asset or `SHA256SUMS` entry | `fetchExpectedSha256()` | Update ignored/refused |
 
 The last one is the one that bites. The car runs a platform-signed build; an APK signed

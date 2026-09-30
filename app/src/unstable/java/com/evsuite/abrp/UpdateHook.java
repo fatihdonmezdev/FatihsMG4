@@ -17,9 +17,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Installation goes through the platform {@link android.content.pm.PackageInstaller}, not
  * {@code pm install -r}: that shelled out with a path inside our private cache, which the
  * package manager service cannot read from its own process, and the generic failure was
- * reported as a signature mismatch it never was. {@link OtaUpdater#install} still checks the
- * downloaded APK's certificate against the running app's first and refuses a mismatch, so an
- * update signed with any other key is deleted rather than installed.
+ * reported as a signature mismatch it never was. As in DriveHub_Dort, PackageInstaller is the
+ * authority for signing-certificate compatibility; the app verifies SHA-256 and package name
+ * before handing it the archive.
  *
  * Committing a session is asynchronous, so the message this returns says an install has been
  * started, never that one finished. {@link OtaInstallResultReceiver} has the verdict.
@@ -128,8 +128,6 @@ final class UpdateHook {
                 // platform may still want the driver to confirm, and either way the verdict
                 // arrives at OtaInstallResultReceiver, not here.
                 return "Kuruluyor: " + update.versionName + " — ekrandaki onayı bekleyin";
-            case SIGNATURE_MISMATCH:
-                return "Kurulum reddedildi: imza uyuşmuyor";
             case UNREADABLE_ARCHIVE:
                 return "Kurulum reddedildi: APK okunamadı";
             default:

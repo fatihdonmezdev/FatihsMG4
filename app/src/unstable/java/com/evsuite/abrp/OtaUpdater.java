@@ -406,13 +406,10 @@ final class OtaUpdater {
     }
 
     /**
-     * What {@link #install} did. Every value except {@link #SESSION_STARTED} is a refusal,
-     * and they are distinct because the single "imza uyuşmuyor?" message they used to share
-     * sent a perfectly well-signed build to the wrong diagnosis.
+     * What {@link #install} did. The PackageInstaller is the authority for signing-certificate
+     * compatibility, matching the proven DriveHub_Dort flow on this head unit.
      */
     enum InstallResult {
-        /** The archive is signed by a different certificate than the running app. */
-        SIGNATURE_MISMATCH,
         /** The package manager cannot parse the archive, or it is for another package. */
         UNREADABLE_ARCHIVE,
         /** Handed to the platform. The outcome arrives at {@link OtaInstallResultReceiver}. */
@@ -435,7 +432,6 @@ final class OtaUpdater {
      * file as soon as this returns.
      */
     static InstallResult install(Context context, File apk) {
-        if (!signatureMatchesRunningApp(context, apk)) return InstallResult.SIGNATURE_MISMATCH;
         if (!archiveIsThisPackage(context, apk)) return InstallResult.UNREADABLE_ARCHIVE;
         try {
             commitSession(context, apk);
@@ -449,9 +445,8 @@ final class OtaUpdater {
     /**
      * True if the archive parses and declares our own package name.
      *
-     * A signature match alone does not say the APK is this app: the same platform key signs
-     * every app on the unit, so a correctly signed archive for some other package would pass
-     * the certificate check and then fail deep inside the installer.
+     * The package name is checked here before any bytes reach an installer session. Android's
+     * PackageInstaller then performs the authoritative signing-certificate and downgrade checks.
      */
     private static boolean archiveIsThisPackage(Context context, File apk) {
         try {
@@ -516,20 +511,4 @@ final class OtaUpdater {
         }
     }
 
-    /**
-     * True if [apk] is signed by the same certificate as the running app.
-     *
-     * Fail closed: an unreadable archive, a missing signature or a failed API call all
-     * return false. The caller must delete the file rather than offer it for install.
-     */
-    static boolean signatureMatchesRunningApp(Context context, File apk) {
-        java.util.Set<String> archive = ApkSignature.of(context, apk.getAbsolutePath());
-        java.util.Set<String> installed = ApkSignature.ofPackage(context);
-        boolean ok = !archive.isEmpty() && !installed.isEmpty() && archive.equals(installed);
-        if (!ok) {
-            Log.w(TAG, "Signature mismatch — refusing update ("
-                    + archive.size() + " vs " + installed.size() + " cert(s))");
-        }
-        return ok;
-    }
 }

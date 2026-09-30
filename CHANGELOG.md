@@ -4,6 +4,14 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.10] - 2026-09-30
+
+### Fixed
+
+- Matched DriveHub_Dort's proven install path: verify SHA-256 and package identity, then
+  let Android PackageInstaller perform the authoritative signing-certificate check. This
+  avoids the head unit's false signature mismatch while remaining fail-closed.
+
 ## [2.2.9] - 2026-09-30
 
 ### Changed
