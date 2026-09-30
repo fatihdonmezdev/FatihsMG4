@@ -103,8 +103,7 @@ public class MainActivity extends AppCompatActivity {
      */
     private EnergyTelemetryReader vehicleReader;
     private TextView vehSoc, vehRange, vehPower, vehSpeed, vehOdometer,
-            vehCharging, vehBattTemp, vehExtTemp, vehCabinTemp, vehHvac,
-            vehCapacity, vehSoe,
+            vehCharging, vehExtTemp, vehHvac, vehSoe,
             vehTireFl, vehTireFr, vehTireRl, vehTireRr;
 
     /**
@@ -762,11 +761,8 @@ public class MainActivity extends AppCompatActivity {
         vehSpeed     = vehiclePane.findViewById(R.id.vehicle_speed);
         vehOdometer  = vehiclePane.findViewById(R.id.vehicle_odometer);
         vehCharging  = vehiclePane.findViewById(R.id.vehicle_charging);
-        vehBattTemp  = vehiclePane.findViewById(R.id.vehicle_batt_temp);
         vehExtTemp   = vehiclePane.findViewById(R.id.vehicle_ext_temp);
-        vehCabinTemp = vehiclePane.findViewById(R.id.vehicle_cabin_temp);
         vehHvac      = vehiclePane.findViewById(R.id.vehicle_hvac);
-        vehCapacity  = vehiclePane.findViewById(R.id.vehicle_capacity);
         vehSoe       = vehiclePane.findViewById(R.id.vehicle_soe);
         vehTireFl    = vehiclePane.findViewById(R.id.vehicle_tire_fl);
         vehTireFr    = vehiclePane.findViewById(R.id.vehicle_tire_fr);
@@ -794,11 +790,8 @@ public class MainActivity extends AppCompatActivity {
             vehPower.setText(fmt(s.getBatteryPowerKw(), "%.1f kW"));
             vehSpeed.setText(fmt(s.getSpeedKmh(), "%.0f km/h"));
             vehOdometer.setText(fmt(s.getOdometerKm(), "%.0f km"));
-            vehBattTemp.setText(fmt(s.getBatteryTempCelsius(), "%.0f °C"));
             vehExtTemp.setText(fmt(s.getOutsideTempCelsius(), "%.0f °C"));
-            vehCabinTemp.setText(fmt(s.getCabinTempCelsius(), "%.0f °C"));
             vehHvac.setText(fmt(s.getClimate().getDriverTargetCelsius(), "%.0f °C"));
-            vehCapacity.setText(fmt(s.getBatteryCapacityKwh(), "%.1f kWh"));
             vehSoe.setText(fmt(s.getBatteryEnergyKwh(), "%.1f kWh"));
 
             vehCharging.setText(chargingLabel(s));

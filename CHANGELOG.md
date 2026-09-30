@@ -4,6 +4,14 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.18] - 2026-09-30
+
+### Changed
+
+- Kept outside temperature on DriveHub_Dort's proven `getOutCarTemp` service path.
+- Removed unavailable battery-temperature, battery-capacity and cabin-temperature rows
+  from the vehicle screen instead of permanently showing dashes.
+
 ## [2.2.17] - 2026-09-30
 
 ### Fixed
