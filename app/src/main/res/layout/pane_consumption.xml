@@ -23,5 +23,10 @@
       <com.google.android.material.button.MaterialButton android:id="@+id/consumption_reset" style="@style/Widget.EV.Button.Outlined" android:layout_width="match_parent" android:layout_height="64dp" android:layout_marginTop="12dp" android:text="Seçili tripi sıfırla" android:visibility="gone"/>
     </LinearLayout>
     <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Son 7/30 gün, tüm zamanlar ve Trip A/B cihazda kalıcı saklanır; uygulama ve OTA güncellemeleriyle silinmez." android:textAppearance="@style/Text.EV.Secondary"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:layout_marginTop="16dp" android:background="@drawable/bg_glass">
+      <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="GÜNLÜK KAYIT · SON 4 AY" android:textAppearance="@style/Text.EV.Eyebrow"/>
+      <com.google.android.material.button.MaterialButton android:id="@+id/consumption_date_button" style="@style/Widget.EV.Button.Outlined" android:layout_width="match_parent" android:layout_height="56dp" android:layout_marginTop="12dp" android:text="Tarih seç"/>
+      <TextView android:id="@+id/consumption_daily_history" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:fontFamily="monospace" android:text="Henüz günlük veri yok" android:textAppearance="@style/Text.EV.Body" android:textColor="@color/ev_cyan"/>
+    </LinearLayout>
   </LinearLayout>
 </ScrollView>

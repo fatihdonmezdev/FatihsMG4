@@ -110,8 +110,10 @@ public class MainActivity extends AppCompatActivity {
     private ConsumptionTracker consumptionTracker;
     private ConsumptionTracker.Period consumptionPeriod = ConsumptionTracker.Period.LIFETIME;
     private TextView consumptionDistance, consumptionEnergy, consumptionAverage,
-            consumptionSpeed, consumptionTime, consumptionSoc;
+            consumptionSpeed, consumptionTime, consumptionSoc, consumptionDailyHistory;
     private Button consumptionReset;
+    private MaterialButton consumptionDateButton;
+    private java.time.LocalDate selectedConsumptionDate = java.time.LocalDate.now();
     private TextView chargeStatus, chargeSoc, chargeVoltage, chargeCurrent, chargePower,
             chargeEnergy, chargeDuration, chargeCurveTable;
     private ChargingGraphView chargeGraph;
@@ -828,6 +830,10 @@ public class MainActivity extends AppCompatActivity {
         consumptionSpeed = consumptionPane.findViewById(R.id.consumption_speed);
         consumptionTime = consumptionPane.findViewById(R.id.consumption_time);
         consumptionSoc = consumptionPane.findViewById(R.id.consumption_soc);
+        consumptionDailyHistory = consumptionPane.findViewById(R.id.consumption_daily_history);
+        consumptionDateButton = consumptionPane.findViewById(R.id.consumption_date_button);
+        consumptionDateButton.setText(selectedConsumptionDate.toString());
+        consumptionDateButton.setOnClickListener(v -> showConsumptionDatePicker());
         consumptionReset = consumptionPane.findViewById(R.id.consumption_reset);
         bindPeriodButton(R.id.consumption_lifetime, ConsumptionTracker.Period.LIFETIME);
         bindPeriodButton(R.id.consumption_week, ConsumptionTracker.Period.WEEK);
@@ -923,6 +929,32 @@ public class MainActivity extends AppCompatActivity {
         consumptionTime.setText(String.format(java.util.Locale.getDefault(), "%d sa %02d dk",
                 minutes / 60, minutes % 60));
         consumptionSoc.setText(String.format(java.util.Locale.getDefault(), "%.1f %%", t.soc));
+        ConsumptionTracker.Totals day = consumptionTracker.totalsForDay(selectedConsumptionDate);
+        if (day.km == 0 && day.kwh == 0 && day.hours == 0 && day.soc == 0) {
+            consumptionDailyHistory.setText("Bu tarih için kayıt yok");
+        } else {
+            String average = day.km < 0.1 ? "—" : String.format(java.util.Locale.getDefault(),
+                    "%.1f kWh/100 km", day.kwh * 100d / day.km);
+            long dayMinutes = Math.round(day.hours * 60d);
+            consumptionDailyHistory.setText(String.format(java.util.Locale.getDefault(),
+                    "Mesafe       %.1f km\nEnerji       %.2f kWh\nOrtalama     %s\nSüre         %d sa %02d dk\nSOC farkı    %.1f %%",
+                    day.km, day.kwh, average, dayMinutes / 60, dayMinutes % 60, day.soc));
+        }
+    }
+
+    private void showConsumptionDatePicker() {
+        java.time.LocalDate selected = selectedConsumptionDate;
+        android.app.DatePickerDialog dialog = new android.app.DatePickerDialog(this,
+                (view, year, month, day) -> {
+                    selectedConsumptionDate = java.time.LocalDate.of(year, month + 1, day);
+                    consumptionDateButton.setText(selectedConsumptionDate.toString());
+                    refreshConsumption();
+                }, selected.getYear(), selected.getMonthValue() - 1, selected.getDayOfMonth());
+        java.time.ZoneId zone = java.time.ZoneId.systemDefault();
+        dialog.getDatePicker().setMaxDate(System.currentTimeMillis());
+        dialog.getDatePicker().setMinDate(java.time.LocalDate.now().minusMonths(4)
+                .atStartOfDay(zone).toInstant().toEpochMilli());
+        dialog.show();
     }
 
     /**

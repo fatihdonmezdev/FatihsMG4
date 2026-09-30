@@ -55,6 +55,7 @@ final class ConsumptionTracker {
                 SharedPreferences.Editor daily = prefs.edit();
                 save(daily, dayKey, add(load(dayKey), km, kwh, hours, dsoc));
                 daily.commit();
+                pruneOldDays();
                 tripA = add(tripA, km, kwh, hours, dsoc);
                 tripB = add(tripB, km, kwh, hours, dsoc);
                 persist();
@@ -95,6 +96,28 @@ final class ConsumptionTracker {
         return result;
     }
 
+    synchronized Totals totalsForDay(LocalDate date) {
+        if (date == null || date.isAfter(LocalDate.now()) || date.isBefore(LocalDate.now().minusMonths(4)))
+            return zero();
+        return load("day_" + date);
+    }
+
+    private void pruneOldDays() {
+        LocalDate oldest = LocalDate.now().minusMonths(4);
+        SharedPreferences.Editor editor = null;
+        for (String key : prefs.getAll().keySet()) {
+            if (!key.startsWith("day_") || key.length() < 14) continue;
+            try {
+                LocalDate date = LocalDate.parse(key.substring(4, 14));
+                if (date.isBefore(oldest)) {
+                    if (editor == null) editor = prefs.edit();
+                    editor.remove(key);
+                }
+            } catch (RuntimeException ignored) { }
+        }
+        if (editor != null) editor.commit();
+    }
+
     /** Preserve anything gathered by 2.2.24 by treating its just-created counter as today. */
     private void migrateCalendarCounters() {
         if (prefs.getBoolean("rolling_days_migrated", false)) return;
@@ -103,6 +126,7 @@ final class ConsumptionTracker {
         if (old.km != 0 || old.kwh != 0 || old.hours != 0 || old.soc != 0)
             save(e, "day_" + LocalDate.now(), old);
         e.putBoolean("rolling_days_migrated", true).commit();
+        pruneOldDays();
     }
 
     private Totals load(String key) { return new Totals(bits(key,"km"), bits(key,"kwh"), bits(key,"h"), bits(key,"soc")); }
