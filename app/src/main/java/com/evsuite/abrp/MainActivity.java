@@ -113,7 +113,7 @@ public class MainActivity extends AppCompatActivity {
             consumptionSpeed, consumptionTime, consumptionSoc;
     private Button consumptionReset;
     private TextView chargeStatus, chargeSoc, chargeVoltage, chargeCurrent, chargePower,
-            chargeEnergy, chargeDuration;
+            chargeEnergy, chargeDuration, chargeCurveTable;
     private ChargingGraphView chargeGraph;
     private long chargeStartMs, lastChargeMs;
     private double chargedKwh;
@@ -883,6 +883,7 @@ public class MainActivity extends AppCompatActivity {
         chargeEnergy = chargingPane.findViewById(R.id.charge_energy);
         chargeDuration = chargingPane.findViewById(R.id.charge_duration);
         chargeGraph = chargingPane.findViewById(R.id.charge_graph);
+        chargeCurveTable = chargingPane.findViewById(R.id.charge_curve_table);
     }
 
     private void refreshCharging(EnergySnapshot s) {
@@ -905,7 +906,10 @@ public class MainActivity extends AppCompatActivity {
         chargeEnergy.setText(charging ? String.format(java.util.Locale.getDefault(), "%.2f kWh", chargedKwh) : "—");
         long sec = chargeStartMs == 0 ? 0 : (now-chargeStartMs)/1000;
         chargeDuration.setText(charging ? String.format(java.util.Locale.getDefault(), "%02d:%02d:%02d", sec/3600,(sec%3600)/60,sec%60) : "—");
-        if (charging) chargeGraph.add(s.getSocPercent(), s.getBatteryPowerKw());
+        if (charging) {
+            chargeGraph.add(s.getSocPercent(), s.getBatteryPowerKw());
+            chargeCurveTable.setText(chargeGraph.tableText());
+        }
     }
 
     private void refreshConsumption() {
