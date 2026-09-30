@@ -155,7 +155,7 @@ public class MainActivity extends AppCompatActivity {
             final int index = i;
             // Animated, so the button does the same thing the swipe does: the direction of
             // travel is what tells the driver where they are in the row.
-            findViewById(TAB_IDS[i]).setOnClickListener(v -> pager.setCurrentItem(index, true));
+            findViewById(TAB_IDS[i]).setOnClickListener(v -> pager.setCurrentItem(index, false));
         }
         markCurrentPage(pager.getCurrentItem());
     }

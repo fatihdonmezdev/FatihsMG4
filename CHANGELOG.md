@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.11] - 2026-09-30
+
+### Changed
+
+- Page tabs now switch immediately without ViewPager's multi-page sliding animation.
+
 ## [2.2.10] - 2026-09-30
 
 ### Fixed
