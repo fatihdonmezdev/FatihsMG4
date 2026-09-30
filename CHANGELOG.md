@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.9] - 2026-09-30
+
+### Changed
+
+- Updated the check-in-progress copy for a fresh OTA upgrade test from 2.2.8.
+
 ## [2.2.8] - 2026-09-29
 
 ### Changed
