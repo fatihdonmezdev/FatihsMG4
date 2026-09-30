@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.15] - 2026-09-30
+
+### Changed
+
+- Published a follow-up build to exercise the public-Downloads installer fallback over OTA.
+
 ## [2.2.14] - 2026-09-30
 
 ### Fixed
