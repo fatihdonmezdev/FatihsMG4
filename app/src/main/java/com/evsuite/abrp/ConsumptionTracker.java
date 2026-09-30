@@ -48,6 +48,25 @@ final class ConsumptionTracker {
                 Float power = s.getBatteryPowerKw();
                 double km = speed == null ? 0d : Math.max(0d,
                         ((lastSpeed == null ? speed : lastSpeed) + speed) * 0.5d) * hours;
+                // DriveHub_Dort lifetime algorithm: trapezoidal speed, the same dead band
+                // and calibration factors, and net DC power including regeneration.
+                float currentSpeed = speed != null ? Math.abs(speed)
+                        : (lastSpeed == null ? 0f : Math.abs(lastSpeed));
+                float lifetimeSpeed = lastSpeed == null ? currentSpeed
+                        : (Math.abs(lastSpeed) + currentSpeed) * 0.5f;
+                if (lifetimeSpeed < 2.5f) lifetimeSpeed = 0f;
+                else if (lifetimeSpeed > 90f) lifetimeSpeed *= 1.0035f;
+                else if (lifetimeSpeed > 30f) lifetimeSpeed *= 1.0015f;
+                double lifetimeKm = lifetimeSpeed * hours;
+                double lifetimeKwh = 0d;
+                if (power != null) {
+                    if (currentSpeed == 0f && power < 0f) {
+                        lifetimeKwh = 0d;
+                    } else {
+                        double effectiveKw = lastPower == null ? power : (lastPower + power) * 0.5d;
+                        lifetimeKwh = effectiveKw * hours;
+                    }
+                }
                 Float vehicleConsumed = s.getVehicleConsumedKwh();
                 double kwh;
                 if (vehicleConsumed != null && lastVehicleConsumedKwh != null
@@ -63,7 +82,7 @@ final class ConsumptionTracker {
                 }
                 double dsoc = (lastSoc == null || s.getSocPercent() == null ||
                         Boolean.TRUE.equals(s.getChargePortConnected())) ? 0d : lastSoc - s.getSocPercent();
-                lifetime = add(lifetime, km, kwh, hours, dsoc);
+                lifetime = add(lifetime, lifetimeKm, lifetimeKwh, hours, dsoc);
                 String dayKey = "day_" + LocalDate.now();
                 SharedPreferences.Editor daily = prefs.edit();
                 save(daily, dayKey, add(load(dayKey), km, kwh, hours, dsoc));
