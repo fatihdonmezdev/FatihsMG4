@@ -207,6 +207,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        ((TextView) findViewById(R.id.version_badge)).setText("v" + BuildConfig.VERSION_NAME);
+
         prefs = getSharedPreferences("abrp_prefs", MODE_PRIVATE);
         securePrefs = SecurePrefs.get(this);
 

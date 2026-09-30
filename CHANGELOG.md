@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.16] - 2026-09-30
+
+### Added
+
+- Added a persistent installed-version badge immediately left of the OTA button.
+
 ## [2.2.15] - 2026-09-30
 
 ### Changed

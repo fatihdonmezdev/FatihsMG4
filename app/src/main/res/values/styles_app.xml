@@ -49,6 +49,17 @@
     <item name="android:fontFamily">sans-serif-medium</item>
     <item name="android:letterSpacing">0.12</item>
   </style>
+  <style name="Text.EV.VersionBadge" parent="Text.EV.Secondary">
+    <item name="android:background">@drawable/bg_version_badge</item>
+    <item name="android:textColor">@color/ev_cyan</item>
+    <item name="android:textSize">13sp</item>
+    <item name="android:fontFamily">sans-serif-medium</item>
+    <item name="android:paddingStart">10dp</item>
+    <item name="android:paddingEnd">10dp</item>
+    <item name="android:paddingTop">6dp</item>
+    <item name="android:paddingBottom">6dp</item>
+    <item name="android:maxLines">1</item>
+  </style>
   <style name="Text.EV.Hero" parent="Text.EV.Display">
     <item name="android:textSize">48sp</item>
     <item name="android:fontFamily">sans-serif-light</item>

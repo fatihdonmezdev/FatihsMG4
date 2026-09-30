@@ -7,6 +7,7 @@
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/design_overview_title" android:textAppearance="@style/Text.EV.Title" android:id="@+id/header_title" android:textSize="24sp"/>
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/design_overview_subtitle" android:textAppearance="@style/Text.EV.Secondary" android:id="@+id/header_subtitle" android:layout_marginTop="6dp"/>
       </LinearLayout>
+      <TextView android:id="@+id/version_badge" style="@style/Text.EV.VersionBadge" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="8dp"/>
       <com.google.android.material.button.MaterialButton android:id="@+id/update_button" style="@style/Widget.EV.Button.Outlined" android:layout_width="72dp" android:layout_height="72dp" android:minWidth="0dp" android:padding="0dp" android:contentDescription="@string/update_check" app:icon="@drawable/ic_refresh" app:iconGravity="textStart" app:iconPadding="0dp" app:iconTint="@color/ev_accent"/>
       <com.google.android.material.button.MaterialButton android:id="@+id/about_button" style="@style/Widget.EV.Button.Outlined" android:layout_width="72dp" android:layout_height="72dp" android:layout_marginStart="8dp" android:minWidth="0dp" android:padding="0dp" android:contentDescription="@string/about_action" app:icon="@drawable/ic_info" app:iconGravity="textStart" app:iconPadding="0dp"/>
     </LinearLayout>
