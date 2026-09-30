@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import com.evsuite.hardware.telemetry.EnergySnapshot;
+import com.evsuite.hardware.FirmwareInfo;
 
 import java.time.LocalDate;
 
@@ -37,6 +38,7 @@ final class ConsumptionTracker {
     }
 
     synchronized void sample(EnergySnapshot s) {
+        migrateSwi69DistanceScale(s.getFirmware());
         long now = s.getTimestampMs();
         if (lastMs > 0 && now > lastMs) {
             double hours = (now - lastMs) / 3_600_000d;
@@ -127,6 +129,20 @@ final class ConsumptionTracker {
             save(e, "day_" + LocalDate.now(), old);
         e.putBoolean("rolling_days_migrated", true).commit();
         pruneOldDays();
+    }
+
+    /** 2.2.27 and earlier multiplied SWI69's already-km/h speed by 3.6. Repair distance only. */
+    private void migrateSwi69DistanceScale(FirmwareInfo.Gen firmware) {
+        if (firmware != FirmwareInfo.Gen.SWI69 || prefs.getBoolean("swi69_distance_v2", false)) return;
+        SharedPreferences.Editor editor = prefs.edit();
+        for (java.util.Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+            String key = entry.getKey();
+            if (!key.endsWith("_km") || !(entry.getValue() instanceof Long)) continue;
+            double oldKm = Double.longBitsToDouble((Long) entry.getValue());
+            editor.putLong(key, Double.doubleToRawLongBits(oldKm / 3.6d));
+        }
+        editor.putBoolean("swi69_distance_v2", true).commit();
+        lifetime = load("life"); tripA = load("a"); tripB = load("b");
     }
 
     private Totals load(String key) { return new Totals(bits(key,"km"), bits(key,"kwh"), bits(key,"h"), bits(key,"soc")); }

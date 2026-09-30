@@ -28,7 +28,7 @@ object VehicleSpeedScale {
      * route of known length, both over by the same 3.5x, with the adapter odometer as the
      * independent reference. Add a generation here only with the same kind of evidence.
      */
-    private val REPORTS_KMH = setOf(FirmwareInfo.Gen.SWI68)
+    private val REPORTS_KMH = setOf(FirmwareInfo.Gen.SWI68, FirmwareInfo.Gen.SWI69)
 
     /** True when this generation needs no conversion at all. */
     fun reportsKmh(generation: FirmwareInfo.Gen): Boolean = generation in REPORTS_KMH

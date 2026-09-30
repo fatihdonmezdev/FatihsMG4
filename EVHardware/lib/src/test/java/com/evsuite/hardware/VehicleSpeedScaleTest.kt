@@ -7,14 +7,16 @@ import org.junit.Test
 
 class VehicleSpeedScaleTest {
 
-    @Test fun `SWI68 reports km per hour and is not converted again`() {
+    @Test fun `SWI68 and SWI69 report km per hour and are not converted again`() {
         assertTrue(VehicleSpeedScale.reportsKmh(FirmwareInfo.Gen.SWI68))
+        assertTrue(VehicleSpeedScale.reportsKmh(FirmwareInfo.Gen.SWI69))
         assertEquals(34.4f, VehicleSpeedScale.toKmh(34.4f, FirmwareInfo.Gen.SWI68), 0.001f)
+        assertEquals(34.4f, VehicleSpeedScale.toKmh(34.4f, FirmwareInfo.Gen.SWI69), 0.001f)
     }
 
     @Test fun `an unproven generation keeps the specified conversion`() {
         FirmwareInfo.Gen.entries
-            .filterNot { it == FirmwareInfo.Gen.SWI68 }
+            .filterNot { it == FirmwareInfo.Gen.SWI68 || it == FirmwareInfo.Gen.SWI69 }
             .forEach { generation ->
                 assertFalse("$generation is not proven", VehicleSpeedScale.reportsKmh(generation))
                 assertEquals(
@@ -28,7 +30,7 @@ class VehicleSpeedScaleTest {
 
     @Test fun `reverse is a speed, not a negative one`() {
         assertEquals(12.0f, VehicleSpeedScale.toKmh(-12.0f, FirmwareInfo.Gen.SWI68), 0.001f)
-        assertEquals(36.0f, VehicleSpeedScale.toKmh(-10.0f, FirmwareInfo.Gen.SWI69), 0.001f)
+        assertEquals(10.0f, VehicleSpeedScale.toKmh(-10.0f, FirmwareInfo.Gen.SWI69), 0.001f)
     }
 
     @Test fun `the drive that proved it now integrates to the route it followed`() {
