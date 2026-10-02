@@ -4,6 +4,47 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.33] - 2026-10-02
+
+### Fixed
+
+- The SOC total no longer loses its meaning after a charge. The consumption counters
+  decided whether the car was charging from `EV_CHARGE_PORT_CONNECTED` alone, and this
+  vehicle's VHAL answers `false` to it with the cable in — the documented reason
+  `ChargingSignal` exists. A charge therefore read as a drive, and every percent gained
+  was booked as negative consumption against the total.
+- The charging screen and the consumption counters now share one answer, in the pure
+  `ChargingState`, so they cannot drift apart again. A charge is the vendor status saying
+  so, or power flowing into the pack with the port agreeing or the car standing still —
+  a stationary car cannot regenerate.
+
+### Changed
+
+- The stored SOC column is zeroed once on upgrade. Distance, energy and time never
+  consulted the charge state, are unaffected by the bug, and are kept.
+
+## [2.2.32] - 2026-10-02
+
+### Fixed
+
+- Consumption now disagrees with neither itself nor the car. Lifetime was integrated from
+  net DC power while the day and trip counters took either the vehicle's own cumulative
+  kWh register or a fallback that discarded regeneration — three sources, three answers,
+  and the fallback read high because recovered energy never subtracted. Every period is
+  now integrated from one step of DriveHub_Dort's algorithm: trapezoidal net DC power,
+  trapezoidal calibrated speed, and compensated (Kahan) accumulation.
+- Integration intervals are measured on the monotonic clock. The head unit's wall clock
+  jumps when it picks up GPS or NTP time, which previously either dropped intervals or
+  invented hours of driving from a single forward jump.
+
+### Changed
+
+- Consumption counters start from zero on this release. The stored totals were produced by
+  the mixed algorithms above and no factor converts them into what is now measured, so the
+  old store is discarded rather than carried forward as a plausible-looking total.
+- `ConsumptionMath` holds the integration as a pure, unit-tested class, per the repository's
+  rule that logic lives outside the Android classes.
+
 ## [2.2.18] - 2026-09-30
 
 ### Changed

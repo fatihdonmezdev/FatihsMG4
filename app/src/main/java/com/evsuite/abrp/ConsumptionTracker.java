@@ -2,13 +2,21 @@ package com.evsuite.abrp;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.SystemClock;
 
 import com.evsuite.hardware.telemetry.EnergySnapshot;
-import com.evsuite.hardware.FirmwareInfo;
 
 import java.time.LocalDate;
 
-/** Persistent, read-only trip/lifetime integration patterned after DriveHub_Dort. */
+/**
+ * Persistent, read-only trip/lifetime integration.
+ *
+ * All five periods are integrated from one {@link ConsumptionMath} step, so they can only
+ * ever disagree by what they cover, never by how they were measured. The counters live in
+ * {@link KahanSum} accumulators in memory and reach storage on a 30-second throttle; the
+ * store is new in 2.2.32, which is what resets the mixed-algorithm history inherited from
+ * earlier builds.
+ */
 final class ConsumptionTracker {
     enum Period { LIFETIME, WEEK, MONTH, TRIP_A, TRIP_B }
 
@@ -19,7 +27,17 @@ final class ConsumptionTracker {
         }
     }
 
-    private static final String PREFS = "consumption_counters_v1";
+    /**
+     * Bumped from v1 deliberately. The old store holds totals accumulated under three
+     * different algorithms; there is no factor that converts them into what this one
+     * measures, so they are discarded rather than carried forward as a plausible lie.
+     */
+    private static final String PREFS = "consumption_counters_v2";
+    private static final String LEGACY_PREFS = "consumption_counters_v1";
+
+    /** How often the in-memory accumulators reach disk. Matches DriveHub_Dort. */
+    private static final long PERSIST_INTERVAL_MS = 30_000L;
+
     private static ConsumptionTracker instance;
     static synchronized ConsumptionTracker get(Context context) {
         if (instance == null) instance = new ConsumptionTracker(context.getApplicationContext());
@@ -27,112 +45,117 @@ final class ConsumptionTracker {
     }
 
     private final SharedPreferences prefs;
-    private Totals lifetime, tripA, tripB;
-    private long lastMs;
-    private Float lastSpeed, lastPower, lastSoc, lastVehicleConsumedKwh;
+    private final Counter lifetime = new Counter();
+    private final Counter tripA = new Counter();
+    private final Counter tripB = new Counter();
+    private final Counter today = new Counter();
+    private LocalDate todayDate;
+
+    /**
+     * Monotonic. {@code EnergySnapshot.timestampMs} is wall clock, and the head unit's
+     * clock jumps when it picks up GPS or NTP time — backwards, in which case intervals
+     * were silently dropped, or forwards, in which case one jump invented hours of driving.
+     */
+    private long lastElapsedMs;
+    private long lastPersistMs;
+    private Float lastSpeed, lastPower, lastSoc;
 
     private ConsumptionTracker(Context context) {
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        lifetime = load("life"); tripA = load("a"); tripB = load("b");
-        migrateCalendarCounters();
+        discardLegacyStore(context);
+        repairSocColumn();
+        lifetime.load(prefs, "life");
+        tripA.load(prefs, "a");
+        tripB.load(prefs, "b");
+        todayDate = LocalDate.now();
+        today.load(prefs, dayKey(todayDate));
+        pruneOldDays();
     }
 
     synchronized void sample(EnergySnapshot s) {
-        migrateSwi69DistanceScale(s.getFirmware());
-        long now = s.getTimestampMs();
-        if (lastMs > 0 && now > lastMs) {
-            double hours = (now - lastMs) / 3_600_000d;
-            // Never bridge a process pause/sleep into invented driving data.
-            if (hours <= 0.1d) {
-                Float speed = s.getSpeedKmh();
-                Float power = s.getBatteryPowerKw();
-                double km = speed == null ? 0d : Math.max(0d,
-                        ((lastSpeed == null ? speed : lastSpeed) + speed) * 0.5d) * hours;
-                // DriveHub_Dort lifetime algorithm: trapezoidal speed, the same dead band
-                // and calibration factors, and net DC power including regeneration.
-                float currentSpeed = speed != null ? Math.abs(speed)
-                        : (lastSpeed == null ? 0f : Math.abs(lastSpeed));
-                float lifetimeSpeed = lastSpeed == null ? currentSpeed
-                        : (Math.abs(lastSpeed) + currentSpeed) * 0.5f;
-                if (lifetimeSpeed < 2.5f) lifetimeSpeed = 0f;
-                else if (lifetimeSpeed > 90f) lifetimeSpeed *= 1.0035f;
-                else if (lifetimeSpeed > 30f) lifetimeSpeed *= 1.0015f;
-                double lifetimeKm = lifetimeSpeed * hours;
-                double lifetimeKwh = 0d;
-                if (power != null) {
-                    if (currentSpeed == 0f && power < 0f) {
-                        lifetimeKwh = 0d;
-                    } else {
-                        double effectiveKw = lastPower == null ? power : (lastPower + power) * 0.5d;
-                        lifetimeKwh = effectiveKw * hours;
-                    }
-                }
-                Float vehicleConsumed = s.getVehicleConsumedKwh();
-                double kwh;
-                if (vehicleConsumed != null && lastVehicleConsumedKwh != null
-                        && vehicleConsumed >= lastVehicleConsumedKwh
-                        && vehicleConsumed - lastVehicleConsumedKwh <= 5f) {
-                    kwh = vehicleConsumed - lastVehicleConsumedKwh;
-                } else {
-                    // Gross draw fallback: regeneration/charging must not make consumption
-                    // look artificially low when the OEM cumulative counter is unavailable.
-                    double effectiveKw = power == null ? 0d
-                            : ((lastPower == null ? power : lastPower) + power) * 0.5d;
-                    kwh = Math.max(0d, effectiveKw) * hours;
-                }
-                double dsoc = (lastSoc == null || s.getSocPercent() == null ||
-                        Boolean.TRUE.equals(s.getChargePortConnected())) ? 0d : lastSoc - s.getSocPercent();
-                lifetime = add(lifetime, lifetimeKm, lifetimeKwh, hours, dsoc);
-                String dayKey = "day_" + LocalDate.now();
-                SharedPreferences.Editor daily = prefs.edit();
-                save(daily, dayKey, add(load(dayKey), km, kwh, hours, dsoc));
-                daily.commit();
-                pruneOldDays();
-                tripA = add(tripA, km, kwh, hours, dsoc);
-                tripB = add(tripB, km, kwh, hours, dsoc);
-                persist();
-            }
-        }
-        lastMs = now; lastSpeed = s.getSpeedKmh(); lastPower = s.getBatteryPowerKw();
-        lastSoc = s.getSocPercent();
-        lastVehicleConsumedKwh = s.getVehicleConsumedKwh();
+        long now = SystemClock.elapsedRealtime();
+        long previous = lastElapsedMs;
+        lastElapsedMs = now;
+
+        Float speed = s.getSpeedKmh();
+        Float power = s.getBatteryPowerKw();
+        Float soc = s.getSocPercent();
+        boolean charging = ChargingState.isCharging(
+                s.getChargingStatus(), s.getChargePortConnected(), power, speed);
+
+        double hours = previous > 0L ? (now - previous) / 3_600_000d : 0d;
+        ConsumptionMath.Step step = ConsumptionMath.integrate(
+                hours, lastSpeed, speed, lastPower, power, lastSoc, soc, charging);
+
+        // Only a real reading becomes the next interval's trapezoid partner; a failed read
+        // must not erase the last known value and turn the next interval into a step change.
+        if (speed != null) lastSpeed = speed;
+        if (power != null) lastPower = power;
+        if (soc != null) lastSoc = soc;
+
+        if (step == null) return;
+
+        rollDayIfNeeded();
+        lifetime.add(step);
+        tripA.add(step);
+        tripB.add(step);
+        today.add(step);
+
+        if (now - lastPersistMs >= PERSIST_INTERVAL_MS) persist();
     }
 
     synchronized Totals totals(Period period) {
         switch (period) {
-            case WEEK: return rollingDays(7); case MONTH: return rollingDays(30); case TRIP_A: return tripA;
-            case TRIP_B: return tripB; default: return lifetime;
+            case WEEK: return rollingDays(7);
+            case MONTH: return rollingDays(30);
+            case TRIP_A: return tripA.snapshot();
+            case TRIP_B: return tripB.snapshot();
+            default: return lifetime.snapshot();
         }
     }
 
     synchronized void reset(Period period) {
-        if (period == Period.TRIP_A) tripA = zero();
-        else if (period == Period.TRIP_B) tripB = zero();
+        if (period == Period.TRIP_A) tripA.reset();
+        else if (period == Period.TRIP_B) tripB.reset();
         else return;
         persist();
     }
 
     synchronized void persist() {
+        lastPersistMs = SystemClock.elapsedRealtime();
         SharedPreferences.Editor e = prefs.edit();
-        save(e, "life", lifetime);
-        save(e, "a", tripA); save(e, "b", tripB);
+        lifetime.save(e, "life");
+        tripA.save(e, "a");
+        tripB.save(e, "b");
+        today.save(e, dayKey(todayDate));
         e.commit();
-    }
-
-    private Totals rollingDays(int days) {
-        Totals result = zero();
-        LocalDate today = LocalDate.now();
-        for (int i = 0; i < days; i++) {
-            Totals day = load("day_" + today.minusDays(i));
-            result = add(result, day.km, day.kwh, day.hours, day.soc);
-        }
-        return result;
     }
 
     synchronized Totals totalsForDay(LocalDate date) {
         if (date == null || date.isAfter(LocalDate.now()) || date.isBefore(LocalDate.now().minusMonths(4)))
             return zero();
-        return load("day_" + date);
+        if (date.equals(todayDate)) return today.snapshot();
+        return loadTotals(dayKey(date));
+    }
+
+    /** Flushes the day that just ended and opens the new one. */
+    private void rollDayIfNeeded() {
+        LocalDate date = LocalDate.now();
+        if (date.equals(todayDate)) return;
+        persist();
+        todayDate = date;
+        today.load(prefs, dayKey(date));
+        pruneOldDays();
+    }
+
+    private Totals rollingDays(int days) {
+        double km = 0, kwh = 0, hours = 0, soc = 0;
+        LocalDate today_ = LocalDate.now();
+        for (int i = 0; i < days; i++) {
+            Totals day = totalsForDay(today_.minusDays(i));
+            km += day.km; kwh += day.kwh; hours += day.hours; soc += day.soc;
+        }
+        return new Totals(km, kwh, hours, soc);
     }
 
     private void pruneOldDays() {
@@ -151,42 +174,85 @@ final class ConsumptionTracker {
         if (editor != null) editor.commit();
     }
 
-    /** Preserve anything gathered by 2.2.24 by treating its just-created counter as today. */
-    private void migrateCalendarCounters() {
-        if (prefs.getBoolean("rolling_days_migrated", false)) return;
-        Totals old = load("week");
-        SharedPreferences.Editor e = prefs.edit();
-        if (old.km != 0 || old.kwh != 0 || old.hours != 0 || old.soc != 0)
-            save(e, "day_" + LocalDate.now(), old);
-        e.putBoolean("rolling_days_migrated", true).commit();
-        pruneOldDays();
-    }
-
-    /** 2.2.27 and earlier multiplied SWI69's already-km/h speed by 3.6. Repair distance only. */
-    private void migrateSwi69DistanceScale(FirmwareInfo.Gen firmware) {
-        if (firmware != FirmwareInfo.Gen.SWI69 || prefs.getBoolean("swi69_distance_v2", false)) return;
+    /**
+     * Zeroes the SOC column once, for 2.2.33.
+     *
+     * Until then a charge was detected from the charge-port property alone, which this
+     * vehicle answers {@code false} to even when the cable is in, so every percent gained
+     * on a charger was booked as negative consumption. Only this column is affected —
+     * distance, energy and time never consulted the charge state — so the rest of the
+     * store is sound and is kept.
+     */
+    private void repairSocColumn() {
+        if (prefs.getBoolean("soc_charge_detection_v2", false)) return;
         SharedPreferences.Editor editor = prefs.edit();
-        for (java.util.Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
-            String key = entry.getKey();
-            if (!key.endsWith("_km") || !(entry.getValue() instanceof Long)) continue;
-            double oldKm = Double.longBitsToDouble((Long) entry.getValue());
-            editor.putLong(key, Double.doubleToRawLongBits(oldKm / 3.6d));
+        for (String key : prefs.getAll().keySet()) {
+            if (key.endsWith("_soc")) editor.putLong(key, Double.doubleToRawLongBits(0d));
         }
-        editor.putBoolean("swi69_distance_v2", true).commit();
-        lifetime = load("life"); tripA = load("a"); tripB = load("b");
+        editor.putBoolean("soc_charge_detection_v2", true).commit();
     }
 
+    /** Deletes the pre-2.2.32 store once, so its mixed-algorithm totals cannot be read back. */
+    private void discardLegacyStore(Context context) {
+        if (prefs.getBoolean("legacy_v1_discarded", false)) return;
+        try {
+            context.deleteSharedPreferences(LEGACY_PREFS);
+        } catch (RuntimeException ignored) {
+            // An older platform without the API: the v1 file is simply never read again.
+        }
+        prefs.edit().putBoolean("legacy_v1_discarded", true).commit();
+    }
 
-    private Totals load(String key) { return new Totals(bits(key,"km"), bits(key,"kwh"), bits(key,"h"), bits(key,"soc")); }
-    private double bits(String key, String field) { return Double.longBitsToDouble(prefs.getLong(key + "_" + field, 0L)); }
-    private static void save(SharedPreferences.Editor e, String key, Totals t) {
-        e.putLong(key+"_km", Double.doubleToRawLongBits(t.km));
-        e.putLong(key+"_kwh", Double.doubleToRawLongBits(t.kwh));
-        e.putLong(key+"_h", Double.doubleToRawLongBits(t.hours));
-        e.putLong(key+"_soc", Double.doubleToRawLongBits(t.soc));
+    private static String dayKey(LocalDate date) { return "day_" + date; }
+
+    private Totals loadTotals(String key) {
+        return new Totals(bits(key, "km"), bits(key, "kwh"), bits(key, "h"), bits(key, "soc"));
     }
-    private static Totals add(Totals t, double km, double kwh, double h, double soc) {
-        return new Totals(t.km + km, t.kwh + kwh, t.hours + h, t.soc + soc);
+
+    private double bits(String key, String field) {
+        return Double.longBitsToDouble(prefs.getLong(key + "_" + field, 0L));
     }
-    private static Totals zero() { return new Totals(0,0,0,0); }
+
+    private static Totals zero() { return new Totals(0, 0, 0, 0); }
+
+    /** The four compensated accumulators that make up one period. */
+    private static final class Counter {
+        private final KahanSum km = new KahanSum();
+        private final KahanSum kwh = new KahanSum();
+        private final KahanSum hours = new KahanSum();
+        private final KahanSum soc = new KahanSum();
+
+        void add(ConsumptionMath.Step step) {
+            km.add(step.km);
+            kwh.add(step.kwh);
+            hours.add(step.hours);
+            soc.add(step.socDrop);
+        }
+
+        void load(SharedPreferences prefs, String key) {
+            km.setTotal(read(prefs, key, "km"));
+            kwh.setTotal(read(prefs, key, "kwh"));
+            hours.setTotal(read(prefs, key, "h"));
+            soc.setTotal(read(prefs, key, "soc"));
+        }
+
+        void save(SharedPreferences.Editor e, String key) {
+            e.putLong(key + "_km", Double.doubleToRawLongBits(km.get()));
+            e.putLong(key + "_kwh", Double.doubleToRawLongBits(kwh.get()));
+            e.putLong(key + "_h", Double.doubleToRawLongBits(hours.get()));
+            e.putLong(key + "_soc", Double.doubleToRawLongBits(soc.get()));
+        }
+
+        void reset() {
+            km.reset(); kwh.reset(); hours.reset(); soc.reset();
+        }
+
+        Totals snapshot() {
+            return new Totals(km.get(), kwh.get(), hours.get(), soc.get());
+        }
+
+        private static double read(SharedPreferences prefs, String key, String field) {
+            return Double.longBitsToDouble(prefs.getLong(key + "_" + field, 0L));
+        }
+    }
 }

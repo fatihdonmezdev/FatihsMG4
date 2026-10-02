@@ -893,9 +893,8 @@ public class MainActivity extends AppCompatActivity {
     private void refreshCharging(EnergySnapshot s) {
         if (chargeStatus == null) return;
         Integer code = s.getChargingStatus();
-        boolean charging = (code != null && (code == 1 || code == 10)) ||
-                (Boolean.TRUE.equals(s.getChargePortConnected()) && s.getBatteryPowerKw() != null
-                        && s.getBatteryPowerKw() < -0.2f);
+        boolean charging = ChargingState.isCharging(
+                code, s.getChargePortConnected(), s.getBatteryPowerKw(), s.getSpeedKmh());
         long now = s.getTimestampMs();
         if (charging && chargeStartMs == 0) { chargeStartMs = now; chargedKwh = 0; }
         if (!charging) { chargeStartMs = 0; lastChargeMs = 0; chargedKwh = 0; }
