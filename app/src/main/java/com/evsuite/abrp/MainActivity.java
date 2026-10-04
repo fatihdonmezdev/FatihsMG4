@@ -70,6 +70,7 @@ public class MainActivity extends AppCompatActivity {
     private TextInputLayout   tokenLayout;
     private TextInputEditText tokenInput;
     private SwitchMaterial    serviceSwitch;
+    private SwitchMaterial    abrpUploadSwitch;
     private SwitchMaterial    autostartSwitch;
     private TextView          statusText;
     private Button            testButton;
@@ -250,6 +251,7 @@ public class MainActivity extends AppCompatActivity {
         tokenLayout         = abrpPane.findViewById(R.id.token_layout);
         tokenInput          = abrpPane.findViewById(R.id.token_input);
         serviceSwitch       = servicePane.findViewById(R.id.service_switch);
+        abrpUploadSwitch    = servicePane.findViewById(R.id.abrp_upload_switch);
         autostartSwitch     = servicePane.findViewById(R.id.autostart_switch);
         statusText          = servicePane.findViewById(R.id.status_text);
         testButton          = abrpPane.findViewById(R.id.test_button);
@@ -275,6 +277,9 @@ public class MainActivity extends AppCompatActivity {
         apiKeyInput.setText(savedApiKeyOrDefault());
         tokenInput.setText(securePrefs.getString(SecurePrefs.KEY_TOKEN, ""));
         serviceSwitch.setChecked(prefs.getBoolean("service_enabled", false));
+        abrpUploadSwitch.setChecked(prefs.getBoolean(
+                UploadSettings.KEY_ABRP_UPLOAD_ENABLED,
+                UploadSettings.DEFAULT_ABRP_UPLOAD_ENABLED));
 
         autostartSwitch.setChecked(
                 prefs.getBoolean(UploadSettings.KEY_AUTOSTART, UploadSettings.DEFAULT_AUTOSTART));
@@ -290,7 +295,9 @@ public class MainActivity extends AppCompatActivity {
         boolean enabled = prefs.getBoolean("service_enabled", false);
         boolean haveCreds = !securePrefs.getString(SecurePrefs.KEY_TOKEN, "").trim().isEmpty()
                          && !securePrefs.getString(SecurePrefs.KEY_API_KEY, "").trim().isEmpty();
-        if (enabled && haveCreds) {
+        boolean uploadEnabled = prefs.getBoolean(UploadSettings.KEY_ABRP_UPLOAD_ENABLED,
+                UploadSettings.DEFAULT_ABRP_UPLOAD_ENABLED);
+        if (enabled && (!uploadEnabled || haveCreds)) {
             // Asked for first, and deliberately: the service declares the `location`
             // foreground type, and since API 34 starting it without the permission behind
             // that type is a SecurityException in its own onCreate. Started this way round,
@@ -308,7 +315,7 @@ public class MainActivity extends AppCompatActivity {
             if (checked) {
                 String apiKey = textOf(apiKeyInput);
                 String token  = textOf(tokenInput);
-                if (apiKey.isEmpty() || token.isEmpty()) {
+                if (abrpUploadSwitch.isChecked() && (apiKey.isEmpty() || token.isEmpty())) {
                     serviceSwitch.setChecked(false);
                     if (apiKey.isEmpty()) apiKeyLayout.setError(getString(R.string.api_key_required));
                     if (token.isEmpty())  tokenLayout.setError(getString(R.string.token_required));
@@ -323,6 +330,22 @@ public class MainActivity extends AppCompatActivity {
                 prefs.edit().putBoolean("service_enabled", false).apply();
                 stopService(new Intent(this, AbrpUploadService.class));
             }
+            refreshStatus();
+        });
+
+        abrpUploadSwitch.setOnCheckedChangeListener((btn, checked) -> {
+            if (checked) {
+                String apiKey = textOf(apiKeyInput);
+                String token = textOf(tokenInput);
+                if (apiKey.isEmpty() || token.isEmpty()) {
+                    abrpUploadSwitch.setChecked(false);
+                    if (apiKey.isEmpty()) apiKeyLayout.setError(getString(R.string.api_key_required));
+                    if (token.isEmpty()) tokenLayout.setError(getString(R.string.token_required));
+                    return;
+                }
+            }
+            prefs.edit().putBoolean(UploadSettings.KEY_ABRP_UPLOAD_ENABLED, checked).apply();
+            AbrpUploadService.reloadSettings();
             refreshStatus();
         });
     }
@@ -362,6 +385,9 @@ public class MainActivity extends AppCompatActivity {
         apiKeyInput.setText(savedApiKeyOrDefault());
         tokenInput.setText(securePrefs.getString(SecurePrefs.KEY_TOKEN, ""));
         serviceSwitch.setChecked(prefs.getBoolean("service_enabled", false));
+        abrpUploadSwitch.setChecked(prefs.getBoolean(
+                UploadSettings.KEY_ABRP_UPLOAD_ENABLED,
+                UploadSettings.DEFAULT_ABRP_UPLOAD_ENABLED));
         autostartSwitch.setChecked(
                 prefs.getBoolean(UploadSettings.KEY_AUTOSTART, UploadSettings.DEFAULT_AUTOSTART));
         // Poll state and log only while the screen is up; onPause cancels it.
@@ -1069,6 +1095,14 @@ public class MainActivity extends AppCompatActivity {
         // Live signal, not the preference: "service_running" stays stale-true after a
         // force-kill because onDestroy never ran.
         UploadLog.State state = AbrpUploadService.state();
+
+        if (AbrpUploadService.isRunning() && !prefs.getBoolean(
+                UploadSettings.KEY_ABRP_UPLOAD_ENABLED,
+                UploadSettings.DEFAULT_ABRP_UPLOAD_ENABLED)) {
+            statusText.setText(R.string.state_tracking_locally);
+            statusText.setTextColor(COLOR_OK);
+            return;
+        }
 
         switch (state) {
             case ERROR:

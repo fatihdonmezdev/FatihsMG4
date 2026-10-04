@@ -4,6 +4,14 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.34] - 2026-10-05
+
+### Added
+
+- Added a separate **Upload telemetry to ABRP** switch. Turning it off keeps background
+  vehicle sampling, consumption history and OTA support running, but stops ABRP network
+  uploads so DiPlay can be the sole live telemetry sender.
+
 ## [2.2.33] - 2026-10-02
 
 ### Fixed

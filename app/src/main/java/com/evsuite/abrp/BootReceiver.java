@@ -50,8 +50,10 @@ public class BootReceiver extends BroadcastReceiver {
         SharedPreferences secure = SecurePrefs.get(context);
         boolean haveCreds = !secure.getString(SecurePrefs.KEY_TOKEN, "").trim().isEmpty()
                          && !secure.getString(SecurePrefs.KEY_API_KEY, "").trim().isEmpty();
+        boolean uploadEnabled = prefs.getBoolean(UploadSettings.KEY_ABRP_UPLOAD_ENABLED,
+                UploadSettings.DEFAULT_ABRP_UPLOAD_ENABLED);
 
-        if (!enabled || !autostart || !haveCreds) {
+        if (!enabled || !autostart || (uploadEnabled && !haveCreds)) {
             Log.i(TAG, action + " ignored (enabled=" + enabled
                     + " autostart=" + autostart + " credentials=" + haveCreds + ")");
             return;

@@ -202,7 +202,7 @@ public class AbrpUploadService extends Service {
         // and something else has to. Idempotent, asynchronous, and absent on a car that does
         // not have the map stack — in which case ext_temp simply stays unreported.
 
-        requestLocationUpdates();
+        if (settings.abrpUploadEnabled) requestLocationUpdates();
 
         // Fire the first upload after a short warm-up, then every UPLOAD_INTERVAL_SEC.
         // scheduleWithFixedDelay ensures we always get at least UPLOAD_INTERVAL_SEC
@@ -293,12 +293,13 @@ public class AbrpUploadService extends Service {
                 mainHandler.post(this::requestLocationUpdates);
                 Log.i(TAG, "Settings reloaded: interval=" + settings.intervalSec + "s"
                         + " boostLowSoc=" + settings.boostLowSoc
-                        + " lowSoc=" + settings.lowSocPercent + "%");
+                        + " lowSoc=" + settings.lowSocPercent + "%"
+                        + " abrpUpload=" + settings.abrpUploadEnabled);
             }
             // Same watchdog for GPS: requestLocationUpdates used to run once in onCreate,
             // so a provider that was off at start-up — or dropped later — meant
             // position-less telemetry for the rest of the session.
-            if (!locationUpdatesActive
+            if (settings.abrpUploadEnabled && !locationUpdatesActive
                     && System.currentTimeMillis() - lastLocationRequestMs
                        > LOCATION_RETRY_INTERVAL_SEC * 1000) {
                 Log.w(TAG, "Location updates inactive, re-arming");
@@ -306,7 +307,8 @@ public class AbrpUploadService extends Service {
             }
             // Before the upload, not after: an upload that fails for want of a network is
             // the thing this is here to prevent. Cheap and rate-limited when already on.
-            if (wifi != null && prefs.getBoolean(MainActivity.WIFI_AUTO_KEY, true)) {
+            if (settings.abrpUploadEnabled && wifi != null
+                    && prefs.getBoolean(MainActivity.WIFI_AUTO_KEY, true)) {
                 wifi.ensureConnected(false);
             }
             doUpload();
@@ -322,6 +324,12 @@ public class AbrpUploadService extends Service {
         long sampleMs = System.currentTimeMillis();
         EnergySnapshot vehicle = energyReader.read(sampleMs);
         consumptionTracker.sample(vehicle);
+
+        // Keep local consumption history alive while another app owns the ABRP feed.
+        if (!settings.abrpUploadEnabled) {
+            updateNotification(getString(R.string.notif_tracking_locally));
+            return;
+        }
 
         String token  = securePrefs.getString(SecurePrefs.KEY_TOKEN,   "").trim();
         String apiKey = securePrefs.getString(SecurePrefs.KEY_API_KEY, "").trim();
@@ -662,6 +670,12 @@ public class AbrpUploadService extends Service {
             locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
             try { locationManager.removeUpdates(locationListener); } catch (Exception ignored) {}
             locationUpdatesActive = false;
+
+            if (!settings.abrpUploadEnabled) {
+                lastLocation = null;
+                Log.i(TAG, "GPS updates stopped while ABRP upload is disabled");
+                return;
+            }
 
             if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                 // Match the upload cadence: a 10 s GPS subscription burned power for

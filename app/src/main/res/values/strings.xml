@@ -74,7 +74,9 @@
     <string name="token_required">Enter your ABRP token first</string>
 
     <string name="card_service">Upload Service</string>
-    <string name="label_upload_enabled">Enable background uploading</string>
+    <string name="label_upload_enabled">Enable background telemetry</string>
+    <string name="label_abrp_upload_enabled">Upload telemetry to ABRP</string>
+    <string name="hint_abrp_upload_enabled">Turn this off when DiPlay sends ABRP data. Local consumption tracking and background telemetry keep running.</string>
     <string name="label_autostart">Start automatically with the car</string>
     <string name="hint_autostart">Uploading resumes on its own when the head unit powers up. Turn this off to start it by hand from this screen.</string>
 
@@ -98,6 +100,8 @@
     <string name="state_stopped">Stopped</string>
     <string name="state_starting">Starting…</string>
     <string name="state_running">Running</string>
+    <string name="state_tracking_locally">Tracking locally — ABRP upload off</string>
+    <string name="notif_tracking_locally">Tracking locally — ABRP upload off</string>
     <string name="state_error">In error — last %1$d uploads failed</string>
 
     <!-- Call log -->
