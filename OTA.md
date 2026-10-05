@@ -70,7 +70,8 @@ The version comes from the **asset filename**, not the git tag. The tag can stay
 
    ```bash
    BT=~/Android/Sdk/build-tools/35.0.0
-   KEYS=~/Desktop/Coding/MG/DriveHub_Kamera/tools
+   # Local copies from DriveHub_Kamera/tools; private and gitignored.
+   KEYS="$PWD/tools"
 
    "$BT/zipalign" -f 4 \
      app/build/outputs/apk/unstable/debug/app-unstable-debug.apk aligned.apk
