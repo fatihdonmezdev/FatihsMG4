@@ -10,7 +10,9 @@ package com.evsuite.abrp;
  * or a regeneration-discarding gross fallback. Three sources, three answers, none of them
  * agreeing with the car's dashboard — the counters were not measuring the same quantity.
  *
- * What the vehicle reports is net DC battery power: positive out of the pack, negative in.
+ * Only moving intervals belong to these driving counters. Parked HVAC/accessory use is
+ * deliberately excluded from distance, energy, time and SOC-drop totals. What the vehicle
+ * reports while moving is net DC battery power: positive out of the pack, negative in.
  * Integrating it as-is means regeneration subtracts, which is exactly what the car's own
  * kWh figure does. Discarding the negative half (the old {@code max(0, kW)} fallback) is
  * what made our number read high.
@@ -69,24 +71,19 @@ final class ConsumptionMath {
                 : (previousSpeedKmh != null ? Math.abs(previousSpeedKmh) : 0f);
         float previous = previousSpeedKmh != null ? Math.abs(previousSpeedKmh) : current;
         float effectiveKmh = (previous + current) * 0.5f;
-        if (effectiveKmh < SPEED_DEAD_BAND_KMH) effectiveKmh = 0f;
-        else if (effectiveKmh > 90f) effectiveKmh *= 1.0035f;
+        if (effectiveKmh < SPEED_DEAD_BAND_KMH) {
+            return new Step(0d, 0d, 0d, 0d);
+        } else if (effectiveKmh > 90f) effectiveKmh *= 1.0035f;
         else if (effectiveKmh > 30f) effectiveKmh *= 1.0015f;
         double km = effectiveKmh * hours;
 
         // Energy: trapezoidal net DC power, regeneration included with its own sign.
         double kwh = 0d;
         if (powerKw != null && Math.abs(powerKw) <= MAX_PLAUSIBLE_KW) {
-            if (current == 0f && powerKw < 0f) {
-                // Standing still with power flowing in is charging or pre-conditioning
-                // recovery, not a drive crediting itself energy it never spent.
-                kwh = 0d;
-            } else {
-                double effectiveKw = previousPowerKw != null && Math.abs(previousPowerKw) <= MAX_PLAUSIBLE_KW
-                        ? (previousPowerKw + powerKw) * 0.5d
-                        : powerKw;
-                kwh = effectiveKw * hours;
-            }
+            double effectiveKw = previousPowerKw != null && Math.abs(previousPowerKw) <= MAX_PLAUSIBLE_KW
+                    ? (previousPowerKw + powerKw) * 0.5d
+                    : powerKw;
+            kwh = effectiveKw * hours;
         }
 
         double socDrop = (!charging && previousSocPercent != null && socPercent != null)

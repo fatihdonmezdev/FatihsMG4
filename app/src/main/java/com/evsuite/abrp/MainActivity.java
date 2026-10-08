@@ -119,7 +119,7 @@ public class MainActivity extends AppCompatActivity {
     private TextInputEditText consumptionSohInput;
     private java.time.LocalDate selectedConsumptionDate = java.time.LocalDate.now();
     private TextView chargeStatus, chargeSoc, chargeStartSoc, chargeVoltage, chargeCurrent, chargePower,
-            chargeEnergy, chargeDuration, chargeTotalCost, chargeCurveTable;
+            chargeEnergy, chargeGridEnergy, chargeDuration, chargeTotalCost, chargeCurveTable;
     private TextInputLayout chargePriceLayout;
     private TextInputEditText chargePriceInput;
     private ChargeSessionTracker chargeSessionTracker;
@@ -936,6 +936,7 @@ public class MainActivity extends AppCompatActivity {
         chargeCurrent = chargingPane.findViewById(R.id.charge_current);
         chargePower = chargingPane.findViewById(R.id.charge_power);
         chargeEnergy = chargingPane.findViewById(R.id.charge_energy);
+        chargeGridEnergy = chargingPane.findViewById(R.id.charge_grid_energy);
         chargeDuration = chargingPane.findViewById(R.id.charge_duration);
         chargeTotalCost = chargingPane.findViewById(R.id.charge_total_cost);
         chargeGraph = chargingPane.findViewById(R.id.charge_graph);
@@ -980,6 +981,8 @@ public class MainActivity extends AppCompatActivity {
         chargeCurrent.setText(fmt(s.getBatteryCurrentA(), "%.1f A"));
         chargePower.setText(s.getBatteryPowerKw() == null ? "—" : String.format(java.util.Locale.getDefault(), "%.1f kW", Math.abs(s.getBatteryPowerKw())));
         chargeEnergy.setText(session.startedAtMs > 0 ? String.format(java.util.Locale.getDefault(), "%.2f kWh", session.energyKwh) : "—");
+        chargeGridEnergy.setText(session.startedAtMs > 0 ? String.format(
+                java.util.Locale.getDefault(), "%.2f kWh", session.gridEnergyKwh) : "—");
         long sec = session.durationSeconds;
         chargeDuration.setText(session.startedAtMs > 0 ? String.format(java.util.Locale.getDefault(), "%02d:%02d:%02d", sec/3600,(sec%3600)/60,sec%60) : "—");
         chargeTotalCost.setText(session.startedAtMs > 0 ? String.format(java.util.Locale.getDefault(), "%.2f ₺", session.totalCost) : "—");

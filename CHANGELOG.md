@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.2.38
+
+### Changed
+
+- Charging cost now uses estimated grid energy: battery-side net kWh plus a fixed 10%
+  charging loss. Both net and estimated grid energy are stored separately.
+- Driving consumption, duration, distance and SOC drop now accumulate only while the car
+  is moving; parked HVAC and accessory use no longer inflate driving statistics.
+
 ## 2.2.37
 
 ### Added

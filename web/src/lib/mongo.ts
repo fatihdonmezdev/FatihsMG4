@@ -41,6 +41,8 @@ export interface ChargingSession {
   endedAt: Date;
   durationSeconds: number;
   energyKwh: number;
+  chargingLossPercent: number;
+  gridEnergyKwh: number;
   pricePerKwh: number;
   totalCost: number;
   startSocPercent?: number;

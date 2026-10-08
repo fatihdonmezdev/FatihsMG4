@@ -36,8 +36,8 @@ export default async function OverviewPage() {
     >
       <div className="tiles">
         <Tile
-          label="Toplam alınan"
-          value={precise(charge.energyKwh)}
+          label="Şebekeden alınan"
+          value={precise(charge.gridEnergyKwh)}
           unit="kWh"
           note={`${charge.sessions} DC şarj`}
           tone="gold"
@@ -45,7 +45,7 @@ export default async function OverviewPage() {
         <Tile
           label="Ödenen"
           value={money(charge.cost)}
-          note={charge.energyKwh > 0 ? `${money(charge.cost / charge.energyKwh)}/kWh ort.` : undefined}
+          note={charge.gridEnergyKwh > 0 ? `${money(charge.cost / charge.gridEnergyKwh)}/kWh ort.` : undefined}
           tone="gold"
         />
         <Tile label="Son 30 gün" value={num(recent.km)} unit="km" note={efficiency(recent.kwh, recent.km)} tone="teal" />
@@ -68,7 +68,8 @@ export default async function OverviewPage() {
           <h2 className="card-title">Son şarj</h2>
           <div className="rows">
             <Row label="Tarih" value={dateTime(lastSession.startedAt)} />
-            <Row label="Alınan enerji" value={`${precise(lastSession.energyKwh)} kWh`} />
+            <Row label="Bataryaya giren net" value={`${precise(lastSession.energyKwh)} kWh`} />
+            <Row label="Şebekeden alınan (+%10)" value={`${precise(lastSession.gridEnergyKwh ?? lastSession.energyKwh * 1.1)} kWh`} />
             <Row
               label="Doluluk"
               value={

@@ -47,6 +47,7 @@ export async function loadOverview(dayLimit = 60, sessionLimit = 60): Promise<Ov
 
 export interface ChargeTotals {
   energyKwh: number;
+  gridEnergyKwh: number;
   cost: number;
   sessions: number;
   seconds: number;
@@ -58,6 +59,7 @@ export function sumCharging(sessions: ChargingSession[]): ChargeTotals {
   return sessions.reduce<ChargeTotals>(
     (total, session) => ({
       energyKwh: total.energyKwh + session.energyKwh,
+      gridEnergyKwh: total.gridEnergyKwh + (session.gridEnergyKwh ?? session.energyKwh * 1.1),
       cost: total.cost + session.totalCost,
       sessions: total.sessions + 1,
       seconds: total.seconds + session.durationSeconds,
@@ -68,7 +70,7 @@ export function sumCharging(sessions: ChargingSession[]): ChargeTotals {
           : 0),
       peakKw: Math.max(total.peakKw, ...session.curve.map((point) => point.powerKw), 0),
     }),
-    { energyKwh: 0, cost: 0, sessions: 0, seconds: 0, socGained: 0, peakKw: 0 },
+    { energyKwh: 0, gridEnergyKwh: 0, cost: 0, sessions: 0, seconds: 0, socGained: 0, peakKw: 0 },
   );
 }
 

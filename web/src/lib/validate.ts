@@ -49,15 +49,21 @@ export function validateChargingSession(body: unknown, pathSessionId: string): C
   });
   const startSocPercent = record.startSocPercent;
   const endSocPercent = record.endSocPercent;
+  const energyKwh = bounded(record.energyKwh, 0, 1000, "energyKwh");
+  const pricePerKwh = bounded(record.pricePerKwh, 0, 1_000_000, "pricePerKwh");
+  const chargingLossPercent = 10;
+  const gridEnergyKwh = energyKwh * 1.1;
   return {
     installationId: validateUuid(record.installationId, "installationId"),
     sessionId,
     startedAt: validateDate(record.startedAt, "startedAt"),
     endedAt: validateDate(record.endedAt, "endedAt"),
     durationSeconds: bounded(record.durationSeconds, 0, 604800, "durationSeconds"),
-    energyKwh: bounded(record.energyKwh, 0, 1000, "energyKwh"),
-    pricePerKwh: bounded(record.pricePerKwh, 0, 1_000_000, "pricePerKwh"),
-    totalCost: bounded(record.totalCost, 0, 1_000_000_000, "totalCost"),
+    energyKwh,
+    chargingLossPercent,
+    gridEnergyKwh,
+    pricePerKwh,
+    totalCost: gridEnergyKwh * pricePerKwh,
     ...(startSocPercent === undefined ? {} : { startSocPercent: bounded(startSocPercent, 0, 100, "startSocPercent") }),
     ...(endSocPercent === undefined ? {} : { endSocPercent: bounded(endSocPercent, 0, 100, "endSocPercent") }),
     curve,

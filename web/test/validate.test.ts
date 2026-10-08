@@ -52,6 +52,8 @@ test("a charging session must match the id in its path", () => {
     endedAt: 1_760_002_000_000,
     durationSeconds: 1800,
     energyKwh: 31.4,
+    chargingLossPercent: 10,
+    gridEnergyKwh: 34.54,
     pricePerKwh: 7.5,
     totalCost: 235.5,
     startSocPercent: 18,
@@ -61,6 +63,9 @@ test("a charging session must match the id in its path", () => {
   const record = validateChargingSession(body, SESSION);
   assert.equal(record.curve.length, 1);
   assert.equal(record.curve[0].powerKw, 84.2);
+  assert.equal(record.chargingLossPercent, 10);
+  assert.equal(record.gridEnergyKwh, 34.54);
+  assert.equal(record.totalCost, 259.05);
   assert.throws(() => validateChargingSession(body, "11111111-2222-4333-8444-555555555556"), ValidationError);
 });
 
@@ -79,6 +84,8 @@ test("refuses a curve longer than the car can produce", () => {
           endedAt: 2,
           durationSeconds: 1,
           energyKwh: 1,
+          chargingLossPercent: 10,
+          gridEnergyKwh: 1.1,
           pricePerKwh: 1,
           totalCost: 1,
           curve,

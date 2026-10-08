@@ -24,6 +24,8 @@ import java.util.UUID;
  * reading the database needs to place it on a timeline — but nothing is measured from them.
  */
 final class ChargeSessionTracker {
+    static final double CHARGING_LOSS_PERCENT = 10d;
+    static final double GRID_ENERGY_FACTOR = 1d + CHARGING_LOSS_PERCENT / 100d;
     private static final String PREFS = "charging_sessions_v1";
     private static final String ACTIVE = "active";
     private static final String LAST = "last_completed";
@@ -67,6 +69,7 @@ final class ChargeSessionTracker {
         final Float startSocPercent;
         final Float currentSocPercent;
         final double energyKwh;
+        final double gridEnergyKwh;
         final double pricePerKwh;
         final double totalCost;
         final List<Point> points;
@@ -80,8 +83,9 @@ final class ChargeSessionTracker {
             this.startSocPercent = startSocPercent;
             this.currentSocPercent = currentSocPercent;
             this.energyKwh = energyKwh;
+            this.gridEnergyKwh = gridEnergyKwh(energyKwh);
             this.pricePerKwh = pricePerKwh;
-            this.totalCost = energyKwh * pricePerKwh;
+            this.totalCost = totalCost(energyKwh, pricePerKwh);
             this.points = points;
         }
     }
@@ -138,6 +142,14 @@ final class ChargeSessionTracker {
 
     synchronized double pricePerKwh() {
         return Double.longBitsToDouble(prefs.getLong(PRICE, 0L));
+    }
+
+    static double gridEnergyKwh(double batteryEnergyKwh) {
+        return batteryEnergyKwh * GRID_ENERGY_FACTOR;
+    }
+
+    static double totalCost(double batteryEnergyKwh, double pricePerKwh) {
+        return gridEnergyKwh(batteryEnergyKwh) * pricePerKwh;
     }
 
     synchronized List<JSONObject> pendingUploads() {
@@ -264,8 +276,12 @@ final class ChargeSessionTracker {
                 }
                 JSONObject json = new JSONObject().put("sessionId", id).put("startedAt", startedAtMs)
                         .put("endedAt", endedAtMs).put("durationSeconds", activeSeconds())
-                        .put("energyKwh", energyKwh).put("pricePerKwh", pricePerKwh)
-                        .put("totalCost", energyKwh * pricePerKwh).put("curve", curve)
+                        .put("energyKwh", energyKwh)
+                        .put("chargingLossPercent", CHARGING_LOSS_PERCENT)
+                        .put("gridEnergyKwh", gridEnergyKwh(energyKwh))
+                        .put("pricePerKwh", pricePerKwh)
+                        .put("totalCost", totalCost(energyKwh, pricePerKwh))
+                        .put("curve", curve)
                         .put("meteredSeconds", meteredSeconds)
                         .put("curveIntervalMs", curveIntervalMs);
                 if (startSoc != null) json.put("startSocPercent", startSoc);

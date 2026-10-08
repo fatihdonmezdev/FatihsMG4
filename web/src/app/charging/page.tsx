@@ -27,11 +27,12 @@ export default async function ChargingPage() {
   return (
     <Shell active="/charging" title="Şarj" subtitle={`${sessions.length} DC seans`}>
       <div className="tiles">
-        <Tile label="Toplam alınan" value={precise(total.energyKwh)} unit="kWh" tone="gold" />
+        <Tile label="Bataryaya giren net" value={precise(total.energyKwh)} unit="kWh" tone="gold" />
+        <Tile label="Şebekeden alınan (+%10)" value={precise(total.gridEnergyKwh)} unit="kWh" tone="gold" />
         <Tile label="Toplam ödenen" value={money(total.cost)} tone="gold" />
         <Tile
           label="Ortalama birim"
-          value={total.energyKwh > 0 ? money(total.cost / total.energyKwh) : "—"}
+          value={total.gridEnergyKwh > 0 ? money(total.cost / total.gridEnergyKwh) : "—"}
           note="kWh başına"
           tone="teal"
         />
@@ -78,7 +79,8 @@ export default async function ChargingPage() {
                       <Row label="Başlangıç" value={dateTime(session.startedAt)} />
                       <Row label="Bitiş" value={dateTime(session.endedAt)} />
                       <Row label="Ölçülen süre" value={duration(session.durationSeconds)} />
-                      <Row label="Alınan enerji" value={`${precise(session.energyKwh)} kWh`} />
+                      <Row label="Bataryaya giren net" value={`${precise(session.energyKwh)} kWh`} />
+                      <Row label="Şebekeden alınan (+%10)" value={`${precise(session.gridEnergyKwh ?? session.energyKwh * 1.1)} kWh`} />
                       <Row label="Kazanılan doluluk" value={gained === null ? "—" : `%${num(gained)}`} />
                       <Row label="Tepe güç" value={peak > 0 ? `${num(peak)} kW` : "—"} />
                       <Row label="Ortalama güç" value={average > 0 ? `${num(average)} kW` : "—"} />
