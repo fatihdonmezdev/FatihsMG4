@@ -1,6 +1,7 @@
 node_modules
 .next
-.env
-.env.local
+# Every .env variant is secret except the committed template.
+.env*
+!.env.example
 next-env.d.ts
 *.tsbuildinfo
