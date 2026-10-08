@@ -15,10 +15,11 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-/** Best-effort MongoDB sync through the API in server/. Never blocks local persistence. */
+/** Best-effort MongoDB sync through the web API. Never blocks local persistence. */
 final class ConsumptionCloudClient {
     private static final String TAG = "FatihsMG4.Mongo";
-    private static final long SYNC_INTERVAL_MS = 5 * 60_000L;
+    private static final long CONSUMPTION_SYNC_INTERVAL_MS = 30 * 60_000L;
+    private static final long CHARGE_RETRY_INTERVAL_MS = 5 * 60_000L;
     private static final int TIMEOUT_MS = 8_000;
     private static final String PREFS = "consumption_cloud";
     private static final String INSTALLATION_ID = "installation_id";
@@ -30,7 +31,9 @@ final class ConsumptionCloudClient {
     private final String token;
     private final String installationId;
     private final SharedPreferences prefs;
-    private long lastAttemptMs;
+    private long lastConsumptionAttemptMs;
+    private long lastChargeAttemptMs;
+    private String lastAttemptedChargeId = "";
 
     ConsumptionCloudClient(Context context) {
         endpoint = BuildConfig.CONSUMPTION_API_URL.trim();
@@ -51,14 +54,15 @@ final class ConsumptionCloudClient {
      */
     void syncIfDue(ConsumptionTracker tracker, ChargeSessionTracker charges, long nowMs) {
         long elapsed = android.os.SystemClock.elapsedRealtime();
-        if (endpoint.isEmpty() || token.isEmpty()
-                || (lastAttemptMs != 0L && elapsed - lastAttemptMs < SYNC_INTERVAL_MS)) return;
-        lastAttemptMs = elapsed;
+        if (endpoint.isEmpty() || token.isEmpty()) return;
+        syncPendingChargesIfDue(charges, elapsed);
+        if (lastConsumptionAttemptMs != 0L
+                && elapsed - lastConsumptionAttemptMs < CONSUMPTION_SYNC_INTERVAL_MS) return;
+        lastConsumptionAttemptMs = elapsed;
         try {
             syncDailyConsumption(tracker, nowMs);
-            syncPendingCharges(charges);
         } catch (Exception e) {
-            Log.w(TAG, "Cloud sync unavailable");
+            Log.w(TAG, "Consumption sync unavailable");
         }
     }
 
@@ -70,23 +74,50 @@ final class ConsumptionCloudClient {
         catch (RuntimeException ignored) { }
         for (int sent = 0; sent < MAX_DAYS_PER_SYNC; sent++) {
             LocalDate target = tracker.nextStoredDayAfter(lastUploaded);
-            if (target == null) return;
+            if (target == null) break;
             ConsumptionTracker.CloudSnapshot snapshot = tracker.cloudSnapshot(target);
-            JSONObject body = new JSONObject()
-                    .put("installationId", installationId)
-                    .put("recordedAt", nowMs)
-                    .put("date", snapshot.date)
-                    .put("day", totals(snapshot.day))
-                    .put("lifetime", totals(snapshot.lifetime));
-            if (snapshot.sohPercent != null) body.put("sohPercent", snapshot.sohPercent);
+            JSONObject body = consumptionBody(snapshot, nowMs);
             if (!send("/v1/consumption/daily", "PUT", body)) return;
             prefs.edit().putString(LAST_CONSUMPTION_DATE, target.toString()).commit();
             lastUploaded = target;
         }
+        // Today's cumulative counters overwrite the same installation/date document every
+        // 30 minutes. Sending totals rather than increments makes retries idempotent.
+        ConsumptionTracker.CloudSnapshot today = tracker.cloudSnapshot(LocalDate.now());
+        JSONObject current = consumptionBody(today, nowMs);
+        send("/v1/consumption/daily", "PUT", current);
     }
 
-    private void syncPendingCharges(ChargeSessionTracker charges) throws Exception {
+    private JSONObject consumptionBody(ConsumptionTracker.CloudSnapshot snapshot, long nowMs)
+            throws Exception {
+        JSONObject body = new JSONObject()
+                .put("installationId", installationId)
+                .put("recordedAt", nowMs)
+                .put("date", snapshot.date)
+                .put("day", totals(snapshot.day))
+                .put("lifetime", totals(snapshot.lifetime));
+        if (snapshot.sohPercent != null) body.put("sohPercent", snapshot.sohPercent);
+        return body;
+    }
+
+    private void syncPendingChargesIfDue(ChargeSessionTracker charges, long elapsed) {
         List<JSONObject> pending = charges.pendingUploads();
+        if (pending.isEmpty()) return;
+        String firstId = pending.get(0).optString("sessionId", "");
+        boolean newlyCompleted = !firstId.equals(lastAttemptedChargeId);
+        if (!newlyCompleted && lastChargeAttemptMs != 0L
+                && elapsed - lastChargeAttemptMs < CHARGE_RETRY_INTERVAL_MS) return;
+        lastAttemptedChargeId = firstId;
+        lastChargeAttemptMs = elapsed;
+        try {
+            syncPendingCharges(charges, pending);
+        } catch (Exception e) {
+            Log.w(TAG, "Charging-session sync unavailable");
+        }
+    }
+
+    private void syncPendingCharges(ChargeSessionTracker charges, List<JSONObject> pending)
+            throws Exception {
         int sent = 0;
         for (JSONObject session : pending) {
             JSONObject body = new JSONObject(session.toString()).put("installationId", installationId);

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.2.39
+
+### Changed
+
+- Today's cumulative driving totals are now upserted to MongoDB every 30 minutes instead
+  of waiting until the following day. Re-sending totals cannot double-count a retry.
+- DC charging sessions remain entirely local while charging and are sent immediately after
+  completion. Failed completed-session uploads remain queued and retry every five minutes.
+
 ## 2.2.38
 
 ### Changed
