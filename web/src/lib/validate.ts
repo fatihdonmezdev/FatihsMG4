@@ -49,6 +49,7 @@ export function validateChargingSession(body: unknown, pathSessionId: string): C
   });
   const startSocPercent = record.startSocPercent;
   const endSocPercent = record.endSocPercent;
+  const isDemo = record.isDemo;
   const energyKwh = bounded(record.energyKwh, 0, 1000, "energyKwh");
   const pricePerKwh = bounded(record.pricePerKwh, 0, 1_000_000, "pricePerKwh");
   const chargingLossPercent = 10;
@@ -64,6 +65,7 @@ export function validateChargingSession(body: unknown, pathSessionId: string): C
     gridEnergyKwh,
     pricePerKwh,
     totalCost: gridEnergyKwh * pricePerKwh,
+    ...(isDemo === true ? { isDemo: true } : {}),
     ...(startSocPercent === undefined ? {} : { startSocPercent: bounded(startSocPercent, 0, 100, "startSocPercent") }),
     ...(endSocPercent === undefined ? {} : { endSocPercent: bounded(endSocPercent, 0, 100, "endSocPercent") }),
     curve,

@@ -45,6 +45,7 @@ export interface ChargingSession {
   gridEnergyKwh: number;
   pricePerKwh: number;
   totalCost: number;
+  isDemo?: boolean;
   startSocPercent?: number;
   endSocPercent?: number;
   curve: CurvePoint[];

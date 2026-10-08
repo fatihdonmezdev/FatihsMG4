@@ -57,6 +57,7 @@ export default async function ChargingPage() {
                     <div>
                       <div className="session-when">{dateTime(session.startedAt)}</div>
                       <div className="session-meta">
+                        {session.isDemo && "Demo · "}
                         {duration(session.durationSeconds)}
                         {gained !== null && ` · %${num(session.startSocPercent as number)} → %${num(session.endSocPercent as number)}`}
                       </div>

@@ -56,6 +56,7 @@ test("a charging session must match the id in its path", () => {
     gridEnergyKwh: 34.54,
     pricePerKwh: 7.5,
     totalCost: 235.5,
+    isDemo: true,
     startSocPercent: 18,
     endSocPercent: 72,
     curve: [{ timestampMs: 1_760_000_060_000, powerKw: 84.2, socPercent: 20 }],
@@ -66,6 +67,7 @@ test("a charging session must match the id in its path", () => {
   assert.equal(record.chargingLossPercent, 10);
   assert.equal(record.gridEnergyKwh, 34.54);
   assert.equal(record.totalCost, 259.05);
+  assert.equal(record.isDemo, true);
   assert.throws(() => validateChargingSession(body, "11111111-2222-4333-8444-555555555556"), ValidationError);
 });
 
