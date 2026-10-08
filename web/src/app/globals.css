@@ -1,0 +1,363 @@
+/*
+ * The car's palette, from app/src/main/res/values/colors.xml.
+ *
+ * Permanent OLED black with charcoal cards and muted gold/cyan accents — the same visual
+ * direction AGENTS.md pins for the head unit, so the phone and the dash read as one app.
+ * No light mode: this is looked at in a dark car as often as anywhere else.
+ */
+:root {
+  --bg: #000000;
+  --surface: #121212;
+  --raised: #1b1d1e;
+  --outline: #363b3d;
+  --text: #f4f3ef;
+  --muted: #bdc4c6;
+  --accent: #d8c39a;
+  --on-accent: #17140e;
+  --cyan: #a0e2e0;
+  --cyan-deep: #103436;
+  --gold-surface: #28241b;
+  --ok: #a4dcc1;
+  --warn: #e9ca96;
+  --error: #ffb4ab;
+
+  --radius: 18px;
+  --gap: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* The phone frame. Wide windows get the same column rather than a stretched dashboard. */
+.shell {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  padding: 20px 16px calc(84px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.title {
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.4px;
+  margin: 0;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 2px 0 0;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.card-title {
+  font-size: 12px;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+
+/* Headline numbers: two per row, gold for energy/cost, cyan for distance/efficiency. */
+.tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap);
+}
+
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.tile.gold {
+  background: linear-gradient(160deg, var(--gold-surface), var(--surface) 70%);
+}
+
+.tile.teal {
+  background: linear-gradient(160deg, var(--cyan-deep), var(--surface) 70%);
+}
+
+.tile-label {
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+
+.tile-value {
+  font-size: 24px;
+  font-weight: 650;
+  margin: 6px 0 0;
+  letter-spacing: -0.5px;
+}
+
+.tile-unit {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 3px;
+}
+
+.tile-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+/* Key/value rows inside a card. */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.row + .row {
+  border-top: 1px solid var(--outline);
+  padding-top: 10px;
+}
+
+.row-key {
+  color: var(--muted);
+}
+
+.row-value {
+  font-weight: 600;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.session {
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.session summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.session summary::-webkit-details-marker {
+  display: none;
+}
+
+.session-when {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.session-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.session-energy {
+  text-align: right;
+  font-size: 18px;
+  font-weight: 650;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.session-cost {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.session-body {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--outline);
+}
+
+.chart {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.legend {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 5px;
+  vertical-align: baseline;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+  padding: 28px 12px;
+}
+
+/* Bottom navigation — the car app falls back to the same pattern below 1000dp. */
+.nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 10, 10, 0.92);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--outline);
+  padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+}
+
+.nav-inner {
+  max-width: 480px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.nav a {
+  text-align: center;
+  padding: 8px 4px;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.nav a[aria-current="page"] {
+  color: var(--accent);
+}
+
+.nav-icon {
+  display: block;
+  font-size: 17px;
+  margin-bottom: 2px;
+}
+
+/* Login */
+.login {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+}
+
+.field {
+  width: 100%;
+  background: var(--raised);
+  border: 1px solid var(--outline);
+  border-radius: 12px;
+  color: var(--text);
+  padding: 13px 14px;
+  font-size: 16px;
+  margin-top: 16px;
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.button {
+  width: 100%;
+  margin-top: 14px;
+  background: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  border-radius: 12px;
+  padding: 13px;
+  font-size: 15px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.error {
+  color: var(--error);
+  font-size: 13px;
+  margin: 14px 0 0;
+}
+
+.signout {
+  font-size: 12px;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--outline);
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
