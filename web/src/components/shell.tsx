@@ -34,9 +34,17 @@ export function Shell({
             <h1 className="title">{title}</h1>
             {subtitle && <p className="subtitle">{subtitle}</p>}
           </div>
-          <Link className="signout" href="/logout">
-            Çıkış
-          </Link>
+          {/*
+            A form, not a link. Next prefetches links that are in the viewport, and this
+            one is in every page header — as a GET route it was fetched on render and
+            signed the reader out before they touched it, which looked like the session
+            expiring on every navigation. Nothing with a side effect may answer GET.
+          */}
+          <form action="/logout" method="post">
+            <button className="signout" type="submit">
+              Çıkış
+            </button>
+          </form>
         </header>
         {children}
       </main>

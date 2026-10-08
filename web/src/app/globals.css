@@ -353,6 +353,7 @@ a {
 }
 
 .signout {
+  font: inherit;
   font-size: 12px;
   color: var(--muted);
   background: none;

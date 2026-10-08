@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { SESSION_COOKIE, checkDashboardPassword, issueSessionValue, sessionCookieOptions } from "@/lib/auth";
+import { SESSION_COOKIE, checkDashboardPassword, issueSessionValue, sessionCookieOptions } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +16,9 @@ export async function POST(request: Request) {
     await new Promise((resolve) => setTimeout(resolve, 250));
     return NextResponse.redirect(new URL("/login?error=1", request.url), { status: 303 });
   }
-  const store = await cookies();
-  store.set(SESSION_COOKIE, issueSessionValue(), sessionCookieOptions);
-  return NextResponse.redirect(new URL("/", request.url), { status: 303 });
+  const response = NextResponse.redirect(new URL("/", request.url), { status: 303 });
+  // Set on the response rather than through the cookies() store: a freshly constructed
+  // redirect does not reliably carry what that store recorded.
+  response.cookies.set(SESSION_COOKIE, issueSessionValue(), sessionCookieOptions);
+  return response;
 }
