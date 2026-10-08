@@ -71,4 +71,21 @@ public class ChargingStateTest {
         assertTrue(ChargingState.isCharging(null, null, -7f, 1f));
         assertFalse(ChargingState.isCharging(null, null, -7f, 10f));
     }
+
+    @Test
+    public void onlyDcSpeedChargingIsMetered() {
+        // The session meter runs on DC alone: 7 kW is a home charge the head unit sleeps
+        // through, so its curve and duration would be fiction.
+        assertFalse(ChargingState.isDcCharging(1, Boolean.TRUE, -7f, 0f));
+        assertTrue(ChargingState.isDcCharging(10, Boolean.TRUE, -50f, 0f));
+        assertTrue(ChargingState.isDcCharging(null, null, -10f, 0f));
+    }
+
+    @Test
+    public void dcMeteringNeedsARealPowerReading() {
+        // Unlike isCharging, which stays permissive so the consumption counters do not
+        // book a charge as a drive, this gates a measurement. No reading, no session.
+        assertFalse(ChargingState.isDcCharging(10, Boolean.TRUE, null, 0f));
+        assertFalse(ChargingState.isDcCharging(null, Boolean.TRUE, 20f, 0f));
+    }
 }

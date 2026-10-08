@@ -967,7 +967,12 @@ public class MainActivity extends AppCompatActivity {
         boolean charging = ChargingState.isCharging(
                 code, s.getChargePortConnected(), s.getBatteryPowerKw(), s.getSpeedKmh());
         ChargeSessionTracker.Snapshot session = chargeSessionTracker.snapshot();
-        chargeStatus.setText(charging ? (code != null && code == 10 ? "DC hızlı şarj" : "AC şarj")
+        // Only DC is metered, so an AC charge must say so rather than let the readouts
+        // below — which then describe the previous DC session — be read as this charge.
+        boolean dc = ChargingState.isDcCharging(
+                code, s.getChargePortConnected(), s.getBatteryPowerKw(), s.getSpeedKmh());
+        chargeStatus.setText(dc ? "DC hızlı şarj"
+                : charging ? "AC şarj (ölçülmüyor)"
                 : (session.startedAtMs > 0 ? "Son şarj" : "Şarj yok"));
         chargeSoc.setText(fmt(s.getSocPercent(), "%.1f %%"));
         chargeStartSoc.setText(fmt(session.startSocPercent, "%.1f %%"));

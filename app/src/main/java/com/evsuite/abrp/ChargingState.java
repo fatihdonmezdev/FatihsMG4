@@ -30,6 +30,16 @@ final class ChargingState {
      * @param powerKw       battery power, negative into the pack, null when unreadable
      * @param speedKmh      road speed, null when unreadable
      */
+    /**
+     * Inbound power at or above which a charge is metered as a session.
+     *
+     * AC charging on this car tops out around 7 kW; anything past 10 kW can only be DC.
+     * The session meter only runs on DC by the owner's choice: an AC charge is an
+     * overnight affair the head unit sleeps through, so its curve, its duration and its
+     * energy total are all guesses, whereas a DC stop happens with the car awake.
+     */
+    static final float DC_MIN_KW = 10f;
+
     static boolean isCharging(Integer status, Boolean portConnected, Float powerKw, Float speedKmh) {
         if (status != null && (status == STATUS_AC_CHARGING || status == STATUS_DC_CHARGING)) {
             return true;
@@ -40,6 +50,18 @@ final class ChargingState {
         // stationary car cannot regenerate, so inbound power at a standstill is a charge.
         if (Boolean.TRUE.equals(portConnected)) return true;
         return speedKmh == null || Math.abs(speedKmh) < STANDSTILL_KMH;
+    }
+
+    /**
+     * Is this a DC fast charge — the only kind the session meter records?
+     *
+     * Deliberately stricter than {@link #isCharging}: the general test exists so the
+     * consumption counters do not book a charge as a drive, and it must stay permissive
+     * for that. This one gates a measurement, so an unreadable power value is a no.
+     */
+    static boolean isDcCharging(Integer status, Boolean portConnected, Float powerKw, Float speedKmh) {
+        if (powerKw == null || !Float.isFinite(powerKw) || -powerKw < DC_MIN_KW) return false;
+        return isCharging(status, portConnected, powerKw, speedKmh);
     }
 
     private ChargingState() { }

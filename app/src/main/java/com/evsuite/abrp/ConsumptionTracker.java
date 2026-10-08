@@ -129,6 +129,10 @@ final class ConsumptionTracker {
         tripA.save(e, "a");
         tripB.save(e, "b");
         today.save(e, dayKey(todayDate));
+        // Lifetime as it stood at the end of this day, so a backlog uploaded days later
+        // does not stamp every one of those days with today's total — which would draw a
+        // flat line and then one cliff in anything plotting it.
+        lifetime.save(e, lifeKey(todayDate));
         e.commit();
     }
 
@@ -141,7 +145,15 @@ final class ConsumptionTracker {
 
     synchronized CloudSnapshot cloudSnapshot(LocalDate date) {
         rollDayIfNeeded();
-        return new CloudSnapshot(date.toString(), totalsForDay(date), lifetime.snapshot(), sohPercent());
+        return new CloudSnapshot(date.toString(), totalsForDay(date), lifetimeAtEndOf(date), sohPercent());
+    }
+
+    /** Lifetime as of the close of {@code date}, falling back to the live counter. */
+    private Totals lifetimeAtEndOf(LocalDate date) {
+        if (date.equals(todayDate)) return lifetime.snapshot();
+        Totals stored = loadTotals(lifeKey(date));
+        boolean missing = stored.km == 0 && stored.kwh == 0 && stored.hours == 0 && stored.soc == 0;
+        return missing ? lifetime.snapshot() : stored;
     }
 
     synchronized LocalDate nextStoredDayAfter(LocalDate lastUploaded) {
@@ -248,6 +260,9 @@ final class ConsumptionTracker {
     }
 
     private static String dayKey(LocalDate date) { return "day_" + date; }
+
+    /** Deliberately shares the {@code day_<date>} prefix so pruning reaches it too. */
+    private static String lifeKey(LocalDate date) { return "day_" + date + "_life"; }
 
     private Totals loadTotals(String key) {
         return new Totals(bits(key, "km"), bits(key, "kwh"), bits(key, "h"), bits(key, "soc"));

@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.2.36
+
+### Changed
+
+- Charging sessions are now metered on DC only (10 kW and above). An AC charge is an
+  overnight affair the head unit sleeps through, so its curve, duration and energy were
+  guesses; the charging screen labels one as `AC şarj (ölçülmüyor)` rather than showing
+  the previous DC session's figures next to it.
+
+### Fixed
+
+- Charging energy and duration are integrated on the monotonic clock. They used the head
+  unit's wall clock, which jumps when it picks up GPS or NTP time — one forward jump
+  mid-charge invented both kWh and hours. This is the same fix the consumption counters
+  already carried.
+- Intervals longer than five minutes are no longer integrated into a charging session. A
+  head unit that slept mid-charge came back and billed the whole gap at the last power
+  reading; a session interrupted overnight reported the night as charging time. Reported
+  duration is now metered charging time, not the wall-clock span from start to end.
+- A daily consumption record uploaded after an offline spell carries the lifetime total as
+  it stood at the close of *that* day. Every backlogged day used to be stamped with the
+  current lifetime, which plots as a flat line and one cliff.
+- The offline charging-session queue is capped at 50 sessions. It is a single
+  SharedPreferences string read into memory in full, and with the cloud endpoint
+  unconfigured nothing ever drained it.
+- A long charge no longer loses the start of its curve. At 720 points the sample interval
+  doubles and the curve is thinned, instead of dropping the oldest point.
+- The cloud sync throttle runs on the monotonic clock, so a backwards clock correction
+  cannot stall syncing. Catch-up now sends up to 10 days and 10 sessions per cycle rather
+  than one and three.
+
 ## 2.2.35
 
 - Added persistent charging sessions with SOC/power curves, duration, energy, unit price,

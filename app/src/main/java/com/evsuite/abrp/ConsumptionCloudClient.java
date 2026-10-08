@@ -23,6 +23,8 @@ final class ConsumptionCloudClient {
     private static final String PREFS = "consumption_cloud";
     private static final String INSTALLATION_ID = "installation_id";
     private static final String LAST_CONSUMPTION_DATE = "last_consumption_date";
+    private static final int MAX_DAYS_PER_SYNC = 10;
+    private static final int MAX_CHARGES_PER_SYNC = 10;
 
     private final String endpoint;
     private final String token;
@@ -42,9 +44,16 @@ final class ConsumptionCloudClient {
         installationId = existing;
     }
 
+    /**
+     * @param nowMs wall clock, recorded with the payload — the throttle below runs on a
+     *              monotonic clock instead, so a backwards NTP correction cannot stall
+     *              syncing for however long the jump was.
+     */
     void syncIfDue(ConsumptionTracker tracker, ChargeSessionTracker charges, long nowMs) {
-        if (endpoint.isEmpty() || token.isEmpty() || nowMs - lastAttemptMs < SYNC_INTERVAL_MS) return;
-        lastAttemptMs = nowMs;
+        long elapsed = android.os.SystemClock.elapsedRealtime();
+        if (endpoint.isEmpty() || token.isEmpty()
+                || (lastAttemptMs != 0L && elapsed - lastAttemptMs < SYNC_INTERVAL_MS)) return;
+        lastAttemptMs = elapsed;
         try {
             syncDailyConsumption(tracker, nowMs);
             syncPendingCharges(charges);
@@ -53,23 +62,26 @@ final class ConsumptionCloudClient {
         }
     }
 
+    /** Drains the backlog a few days per cycle; one a cycle took an hour per fortnight. */
     private void syncDailyConsumption(ConsumptionTracker tracker, long nowMs) throws Exception {
         String saved = prefs.getString(LAST_CONSUMPTION_DATE, "");
         LocalDate lastUploaded = null;
         try { if (saved != null && !saved.isEmpty()) lastUploaded = LocalDate.parse(saved); }
         catch (RuntimeException ignored) { }
-        LocalDate target = tracker.nextStoredDayAfter(lastUploaded);
-        if (target == null) return;
-        ConsumptionTracker.CloudSnapshot snapshot = tracker.cloudSnapshot(target);
-        JSONObject body = new JSONObject()
-                .put("installationId", installationId)
-                .put("recordedAt", nowMs)
-                .put("date", snapshot.date)
-                .put("day", totals(snapshot.day))
-                .put("lifetime", totals(snapshot.lifetime));
-        if (snapshot.sohPercent != null) body.put("sohPercent", snapshot.sohPercent);
-        if (send("/v1/consumption/daily", "PUT", body)) {
+        for (int sent = 0; sent < MAX_DAYS_PER_SYNC; sent++) {
+            LocalDate target = tracker.nextStoredDayAfter(lastUploaded);
+            if (target == null) return;
+            ConsumptionTracker.CloudSnapshot snapshot = tracker.cloudSnapshot(target);
+            JSONObject body = new JSONObject()
+                    .put("installationId", installationId)
+                    .put("recordedAt", nowMs)
+                    .put("date", snapshot.date)
+                    .put("day", totals(snapshot.day))
+                    .put("lifetime", totals(snapshot.lifetime));
+            if (snapshot.sohPercent != null) body.put("sohPercent", snapshot.sohPercent);
+            if (!send("/v1/consumption/daily", "PUT", body)) return;
             prefs.edit().putString(LAST_CONSUMPTION_DATE, target.toString()).commit();
+            lastUploaded = target;
         }
     }
 
@@ -81,7 +93,7 @@ final class ConsumptionCloudClient {
             String id = session.getString("sessionId");
             if (!send("/v1/charging-sessions/" + id, "PUT", body)) return;
             charges.markUploaded(id);
-            if (++sent >= 3) return;
+            if (++sent >= MAX_CHARGES_PER_SYNC) return;
         }
     }
 
