@@ -37,6 +37,11 @@ android {
         versionCode 51
         versionName "2.2.34"
 
+        // MongoDB credentials never ship in the APK. The app only talks to the small
+        // authenticated API in server/, which owns the database connection.
+        buildConfigField "String", "CONSUMPTION_API_URL", "\"${System.getenv('CONSUMPTION_API_URL') ?: ''}\""
+        buildConfigField "String", "CONSUMPTION_API_TOKEN", "\"${System.getenv('CONSUMPTION_API_TOKEN') ?: ''}\""
+
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -104,7 +109,7 @@ android {
 }
 
 // Version publiée par la CI pour composer le nom de l'asset APK : ce nom DOIT être
-// comparable par l'updater ("EVABRPUploader-unstable-1.0.42.apk"). Le tag de la
+// comparable par l'updater ("FatihsMG4-unstable-1.0.42.apk"). Le tag de la
 // pré-release est la constante "unstable", écrasée à chaque build.
 tasks.register('printUnstableVersion') {
     doLast {
@@ -120,8 +125,8 @@ androidComponents {
                 // Le canal unstable garde un nom de fichier stable : l'updater identifie
                 // la version par le tag de la pré-release, jamais par le nom d'APK.
                 output.outputFileName.set(variant.flavorName == "unstable"
-                        ? "EVABRPUploader-unstable.apk"
-                        : "EVABRPUploader-${variant.flavorName}-${output.versionName.get()}.apk")
+                        ? "FatihsMG4-unstable.apk"
+                        : "FatihsMG4-${variant.flavorName}-${output.versionName.get()}.apk")
             }
         }
     }

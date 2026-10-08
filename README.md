@@ -1,11 +1,8 @@
-# EVABRPUploader
+# FatihsMG4
 
-<p align="center"><img src="docs/logo.svg" width="440" alt="EVABRPUploader"></p>
+<p align="center"><img src="docs/logo.svg" width="440" alt="FatihsMG4"></p>
 
-[![Tests](https://github.com/malys/EVABRPUploader/actions/workflows/tests.yml/badge.svg)](https://github.com/malys/EVABRPUploader/actions/workflows/tests.yml)
-[![Security](https://github.com/malys/EVABRPUploader/actions/workflows/security.yml/badge.svg)](https://github.com/malys/EVABRPUploader/actions/workflows/security.yml)
-[![Unstable](https://github.com/malys/EVABRPUploader/actions/workflows/unstable.yml/badge.svg)](https://github.com/malys/EVABRPUploader/actions/workflows/unstable.yml)
-[![Release](https://img.shields.io/github/v/release/malys/EVABRPUploader?include_prereleases&sort=semver)](https://github.com/malys/EVABRPUploader/releases)
+[![Release](https://img.shields.io/github/v/release/fatihdonmezdev/FatihsMG4?include_prereleases&sort=semver)](https://github.com/fatihdonmezdev/FatihsMG4/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Sends live telemetry from an **MG4 (SAIC eh32)** to
@@ -112,7 +109,7 @@ Two channels. Pick one — they install side by side.
 | **Stable** | No. Contains no updater at all. | You want the car to run what you put on it |
 | **Unstable** | Yes, from GitHub pre-releases | You are testing and want fixes as they land |
 
-Grab the APK from [Releases](https://github.com/malys/EVABRPUploader/releases). Stable builds are the tagged ones; unstable builds
+Grab the APK from [Releases](https://github.com/fatihdonmezdev/FatihsMG4/releases). Stable builds are the tagged ones; unstable builds
 are marked pre-release.
 
 ### Getting the APK onto the car

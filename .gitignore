@@ -19,6 +19,10 @@ local.properties
 mise.local.toml
 .mise.local.toml
 
+# Local API configuration and dependencies.
+/server/.env
+/server/node_modules
+
 # Signed build output. Rebuilt from source by ./gradlew assembleUnstableDebug and
 # signed locally — a checked-in APK is stale the moment anything above it changes.
 *.apk

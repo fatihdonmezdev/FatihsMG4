@@ -34,6 +34,7 @@ final class ConsumptionTracker {
      */
     private static final String PREFS = "consumption_counters_v2";
     private static final String LEGACY_PREFS = "consumption_counters_v1";
+    private static final String SOH_PERCENT = "manual_soh_percent";
 
     /** How often the in-memory accumulators reach disk. Matches DriveHub_Dort. */
     private static final long PERSIST_INTERVAL_MS = 30_000L;
@@ -136,6 +137,29 @@ final class ConsumptionTracker {
             return zero();
         if (date.equals(todayDate)) return today.snapshot();
         return loadTotals(dayKey(date));
+    }
+
+    synchronized CloudSnapshot cloudSnapshot() {
+        return new CloudSnapshot(lifetime.snapshot(), sohPercent());
+    }
+
+    static final class CloudSnapshot {
+        final Totals lifetime;
+        final Float sohPercent;
+
+        CloudSnapshot(Totals lifetime, Float sohPercent) {
+            this.lifetime = lifetime;
+            this.sohPercent = sohPercent;
+        }
+    }
+
+    synchronized Float sohPercent() {
+        return prefs.contains(SOH_PERCENT) ? prefs.getFloat(SOH_PERCENT, 0f) : null;
+    }
+
+    synchronized boolean setSohPercent(float value) {
+        if (!Float.isFinite(value) || value <= 0f || value > 100f) return false;
+        return prefs.edit().putFloat(SOH_PERCENT, value).commit();
     }
 
     /** Flushes the day that just ended and opens the new one. */

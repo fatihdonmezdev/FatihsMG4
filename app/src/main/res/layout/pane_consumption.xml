@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
   <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="24dp">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:background="@drawable/bg_glass">
       <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="TÜKETİM DÖNEMİ" android:textAppearance="@style/Text.EV.Eyebrow"/>
@@ -23,6 +23,14 @@
       <com.google.android.material.button.MaterialButton android:id="@+id/consumption_reset" style="@style/Widget.EV.Button.Outlined" android:layout_width="match_parent" android:layout_height="64dp" android:layout_marginTop="12dp" android:text="Seçili tripi sıfırla" android:visibility="gone"/>
     </LinearLayout>
     <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Son 7/30 gün, tüm zamanlar ve Trip A/B cihazda kalıcı saklanır; uygulama ve OTA güncellemeleriyle silinmez." android:textAppearance="@style/Text.EV.Secondary"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:layout_marginTop="16dp" android:background="@drawable/bg_glass">
+      <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="BATARYA SAĞLIĞI (SOH)" android:textAppearance="@style/Text.EV.Eyebrow"/>
+      <com.google.android.material.textfield.TextInputLayout android:id="@+id/consumption_soh_layout" style="@style/Widget.Material3.TextInputLayout.OutlinedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="Manuel SoH (%)" app:suffixText="%">
+        <com.google.android.material.textfield.TextInputEditText android:id="@+id/consumption_soh_input" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" android:maxLength="5" android:minHeight="72dp"/>
+      </com.google.android.material.textfield.TextInputLayout>
+      <com.google.android.material.button.MaterialButton android:id="@+id/consumption_soh_save" style="@style/Widget.EV.Button" android:layout_width="match_parent" android:layout_height="72dp" android:layout_marginTop="8dp" android:text="SoH değerini kaydet"/>
+      <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Bu manuel değer cihazda saklanır ve MongoDB'deki tüm zamanlar kaydına eklenir." android:textAppearance="@style/Text.EV.Secondary"/>
+    </LinearLayout>
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:layout_marginTop="16dp" android:background="@drawable/bg_glass">
       <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="GÜNLÜK KAYIT · SON 4 AY" android:textAppearance="@style/Text.EV.Eyebrow"/>
       <com.google.android.material.button.MaterialButton android:id="@+id/consumption_date_button" style="@style/Widget.EV.Button.Outlined" android:layout_width="match_parent" android:layout_height="56dp" android:layout_marginTop="12dp" android:text="Tarih seç"/>

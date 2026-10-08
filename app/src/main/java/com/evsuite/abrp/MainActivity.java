@@ -12,6 +12,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Toast;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -42,7 +43,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int LOCATION_PERMISSION_REQUEST = 100;
     /** Shared with {@link AbrpUploadService}, which reads it on every tick. */
     static final String WIFI_AUTO_KEY = "wifi_auto_connect";
-    private static final String REPOSITORY_URL = "https://github.com/fatihdonmezdev/MG4ABRP";
+    private static final String REPOSITORY_URL = "https://github.com/fatihdonmezdev/FatihsMG4";
 
     /** Navigation destinations in page order. Parallel to {@link #panes}. */
     private static final int[] TAB_IDS =
@@ -114,6 +115,8 @@ public class MainActivity extends AppCompatActivity {
             consumptionSpeed, consumptionTime, consumptionSoc, consumptionDailyHistory;
     private Button consumptionReset;
     private MaterialButton consumptionDateButton;
+    private TextInputLayout consumptionSohLayout;
+    private TextInputEditText consumptionSohInput;
     private java.time.LocalDate selectedConsumptionDate = java.time.LocalDate.now();
     private TextView chargeStatus, chargeSoc, chargeVoltage, chargeCurrent, chargePower,
             chargeEnergy, chargeDuration, chargeCurveTable;
@@ -861,6 +864,12 @@ public class MainActivity extends AppCompatActivity {
         consumptionDateButton.setText(selectedConsumptionDate.toString());
         consumptionDateButton.setOnClickListener(v -> showConsumptionDatePicker());
         consumptionReset = consumptionPane.findViewById(R.id.consumption_reset);
+        consumptionSohLayout = consumptionPane.findViewById(R.id.consumption_soh_layout);
+        consumptionSohInput = consumptionPane.findViewById(R.id.consumption_soh_input);
+        Float savedSoh = consumptionTracker.sohPercent();
+        if (savedSoh != null) consumptionSohInput.setText(String.format(
+                java.util.Locale.US, "%.1f", savedSoh));
+        consumptionPane.findViewById(R.id.consumption_soh_save).setOnClickListener(v -> saveSoh());
         bindPeriodButton(R.id.consumption_lifetime, ConsumptionTracker.Period.LIFETIME);
         bindPeriodButton(R.id.consumption_week, ConsumptionTracker.Period.WEEK);
         bindPeriodButton(R.id.consumption_month, ConsumptionTracker.Period.MONTH);
@@ -878,6 +887,19 @@ public class MainActivity extends AppCompatActivity {
                         refreshConsumption();
                     }).show();
         });
+    }
+
+    private void saveSoh() {
+        String raw = textOf(consumptionSohInput).replace(',', '.');
+        try {
+            float value = Float.parseFloat(raw);
+            if (!consumptionTracker.setSohPercent(value)) throw new NumberFormatException();
+            consumptionSohLayout.setError(null);
+            consumptionSohInput.setText(String.format(java.util.Locale.US, "%.1f", value));
+            Toast.makeText(this, "SoH kaydedildi", Toast.LENGTH_SHORT).show();
+        } catch (NumberFormatException e) {
+            consumptionSohLayout.setError("1 ile 100 arasında bir değer girin");
+        }
     }
 
     private void bindPeriodButton(int id, ConsumptionTracker.Period period) {

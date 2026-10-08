@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Fatih\'sMG4</string>
+    <string name="app_name">FatihsMG4</string>
 
     <!-- Main screen -->
     <string name="tab_abrp">ABRP</string>
@@ -128,9 +128,9 @@
     <string name="about_title">Fatih\'sMG4 Hakkında</string>
     <string name="about_version">Version %1$s</string>
     <string name="about_attribution">Fork of malys / EVABRPUploader\nand Leon Kernan / ABRP_Uploader</string>
-    <string name="about_repository">github.com/fatihdonmezdev/MG4ABRP</string>
+    <string name="about_repository">github.com/fatihdonmezdev/FatihsMG4</string>
     <string name="about_made_with_love">MG4 EH32 · SWI69</string>
-    <string name="about_logo_description">EVABRPUploader logo</string>
+    <string name="about_logo_description">FatihsMG4 logo</string>
     <string name="about_qr_description">QR code for the project repository</string>
     <string name="about_version_unknown">unknown</string>
     <string name="about_close">Close</string>

@@ -53,7 +53,7 @@ import java.security.MessageDigest;
 final class OtaUpdater {
 
     private static final String TAG = "OtaUpdater";
-    private static final String CACHE_PREFIX = "EVABRPUploader-ota-";
+    private static final String CACHE_PREFIX = "FatihsMG4-ota-";
 
     /**
      * Pre-releases live here; the unstable channel tracks them.
@@ -64,7 +64,7 @@ final class OtaUpdater {
      * nothing until this repository publishes a release, which is the intended quiet.
      */
     private static final String RELEASES_API =
-            "https://api.github.com/repos/fatihdonmezdev/MG4ABRP/releases";
+            "https://api.github.com/repos/fatihdonmezdev/FatihsMG4/releases";
 
     /**
      * Hosts an update may come from. The githubusercontent entries are the CDNs GitHub
@@ -162,7 +162,7 @@ final class OtaUpdater {
 
     /**
      * Version carried by an unstable asset name:
-     * "EVABRPUploader-unstable-1.0.42.apk" -> "1.0.42".
+     * "FatihsMG4-unstable-1.0.42.apk" -> "1.0.42".
      *
      * The release tag is the fixed string "unstable" (one rolling pre-release), so the asset
      * name is what identifies a build. Returns null when the name carries no version.
@@ -198,7 +198,7 @@ final class OtaUpdater {
         try {
             conn.setInstanceFollowRedirects(false);
             conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
-            conn.setRequestProperty("User-Agent", "EVABRPUploader-Android");
+            conn.setRequestProperty("User-Agent", "FatihsMG4-Android");
             conn.setConnectTimeout(TIMEOUT_MS);
             conn.setReadTimeout(TIMEOUT_MS);
             int status = conn.getResponseCode();
@@ -297,7 +297,7 @@ final class OtaUpdater {
             connection.setInstanceFollowRedirects(false);
             connection.setConnectTimeout(TIMEOUT_MS);
             connection.setReadTimeout(TIMEOUT_MS);
-            connection.setRequestProperty("User-Agent", "EVABRPUploader-Android");
+            connection.setRequestProperty("User-Agent", "FatihsMG4-Android");
             try {
                 int status = connection.getResponseCode();
                 if (status >= 300 && status <= 399) {
@@ -358,7 +358,7 @@ final class OtaUpdater {
         long downloadId = -1L;
         try {
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(update.apkUrl))
-                    .setTitle("EVABRPUploader " + update.versionName)
+                    .setTitle("FatihsMG4 " + update.versionName)
                     .setDescription("Güncelleme indiriliyor")
                     .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                     .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, publicName)
@@ -564,7 +564,7 @@ final class OtaUpdater {
         Intent install = new Intent(Intent.ACTION_VIEW)
                 .setDataAndType(contentUri, "application/vnd.android.package-archive")
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        install.setClipData(ClipData.newRawUri("EVABRPUploader update", contentUri));
+        install.setClipData(ClipData.newRawUri("FatihsMG4 update", contentUri));
         grantToInstallers(context, contentUri);
         if (install.resolveActivity(context.getPackageManager()) == null) {
             throw new IllegalStateException("No package installer activity");

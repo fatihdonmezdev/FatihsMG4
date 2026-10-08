@@ -22,7 +22,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "EVABRPUploader"
+rootProject.name = "FatihsMG4"
 include ':app'
 include ':evhardware'
 project(':evhardware').projectDir = file('EVHardware/lib')

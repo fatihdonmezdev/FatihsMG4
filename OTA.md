@@ -25,7 +25,7 @@ vehicle's shared UID; do not use that preview APK for the MG4 upgrade.
 
 ## What the updater actually looks for
 
-`OtaUpdater.check()` reads `https://api.github.com/repos/fatihdonmezdev/MG4ABRP/releases`
+`OtaUpdater.check()` reads `https://api.github.com/repos/fatihdonmezdev/FatihsMG4/releases`
 and walks **every** entry, keeping the highest version rather than the first match. A
 release is a candidate only if all of these hold:
 
@@ -99,7 +99,7 @@ The version comes from the **asset filename**, not the git tag. The tag can stay
    "$BT/apksigner" verify --print-certs FatihsMG4-unstable-2.2.7.apk
    ```
 
-5. **Publish.** On github.com/fatihdonmezdev/MG4ABRP → Releases → Draft a new release:
+5. **Publish.** On github.com/fatihdonmezdev/FatihsMG4 → Releases → Draft a new release:
    - tag: `unstable` (reuse it; the rolling tag is the design)
    - **tick "Set as a pre-release"** ← the whole thing is inert without this
    - attach the signed APK and its `.sha256` sidecar

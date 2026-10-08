@@ -102,13 +102,13 @@ public class OtaUpdaterTest {
     @Test
     public void versionIsReadFromTheAssetName() {
         // The release tag is the constant "unstable", so the asset name carries the build.
-        assertEquals("1.0.42", OtaUpdater.versionFromAssetName("EVABRPUploader-unstable-1.0.42.apk"));
-        assertEquals("1.0.100", OtaUpdater.versionFromAssetName("EVABRPUploader-unstable-1.0.100.APK"));
+        assertEquals("1.0.42", OtaUpdater.versionFromAssetName("FatihsMG4-unstable-1.0.42.apk"));
+        assertEquals("1.0.100", OtaUpdater.versionFromAssetName("FatihsMG4-unstable-1.0.100.APK"));
     }
 
     @Test
     public void assetNameWithoutAVersionIsIgnored() {
-        assertNull(OtaUpdater.versionFromAssetName("EVABRPUploader-unstable.apk"));
+        assertNull(OtaUpdater.versionFromAssetName("FatihsMG4-unstable.apk"));
         assertNull(OtaUpdater.versionFromAssetName("unstable"));
     }
 
@@ -218,7 +218,7 @@ public class OtaUpdaterTest {
     private static JSONObject asset(String version) throws Exception {
         String name = "FatihsMG4-unstable-" + version + ".apk";
         return new JSONObject().put("name", name).put("browser_download_url",
-                "https://github.com/fatihdonmezdev/MG4ABRP/releases/download/unstable/" + name);
+                "https://github.com/fatihdonmezdev/FatihsMG4/releases/download/unstable/" + name);
     }
 
     private static JSONObject release(boolean prerelease, JSONObject... assets) throws Exception {
@@ -249,7 +249,7 @@ public class OtaUpdaterTest {
         boolean disconnected;
 
         Response(int status, String body) throws Exception {
-            super(new URL("https://api.github.com/repos/fatihdonmezdev/MG4ABRP/releases"));
+            super(new URL("https://api.github.com/repos/fatihdonmezdev/FatihsMG4/releases"));
             this.status = status;
             this.body = body;
         }

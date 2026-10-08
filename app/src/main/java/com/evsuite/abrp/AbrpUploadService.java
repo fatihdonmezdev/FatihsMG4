@@ -130,6 +130,7 @@ public class AbrpUploadService extends Service {
 
     private EnergyTelemetryReader energyReader;
     private ConsumptionTracker consumptionTracker;
+    private ConsumptionCloudClient consumptionCloudClient;
     /**
      * Keeps the unit on the phone hotspot without a trip into Settings. Attempted on the
      * upload tick because that is exactly when being offline costs something, and it is
@@ -196,6 +197,7 @@ public class AbrpUploadService extends Service {
         // One shared, firmware-aware EVHardware snapshot owns every vehicle signal.
         energyReader = new EnergyTelemetryReader(getApplicationContext());
         consumptionTracker = ConsumptionTracker.get(this);
+        consumptionCloudClient = new ConsumptionCloudClient(getApplicationContext());
         wifi = new WifiAutoConnect(getApplicationContext());
         // The head unit's own weather service, bound for one reason: ENV_OUTSIDE_TEMPERATURE
         // is not implemented on this vehicle, so the car cannot say how warm it is outside
@@ -324,6 +326,7 @@ public class AbrpUploadService extends Service {
         long sampleMs = System.currentTimeMillis();
         EnergySnapshot vehicle = energyReader.read(sampleMs);
         consumptionTracker.sample(vehicle);
+        consumptionCloudClient.syncIfDue(consumptionTracker.cloudSnapshot(), sampleMs);
 
         // Keep local consumption history alive while another app owns the ABRP feed.
         if (!settings.abrpUploadEnabled) {
