@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.2.37
+
+### Added
+
+- Cloud sync is configured. The build carries the API origin and a write-only ingest
+  token, so daily consumption and completed DC charging sessions reach MongoDB, and
+  whatever queued up while offline is uploaded once connectivity returns.
+
+### Changed
+
+- The consumption API moved from a standalone Express service to a Next.js app on Vercel,
+  which also serves a dashboard for reading the history back. The token in this APK opens
+  the write endpoints only — reading needs a password the APK does not contain, and the
+  MongoDB URI remains server-side and has never been in a build.
+
 ## 2.2.36
 
 ### Changed
