@@ -22,6 +22,16 @@ public final class ChargingGraphView extends View {
         points.add(new float[]{soc,p}); if (points.size() > 500) points.remove(0);
         socPower[Math.max(0, Math.min(100, Math.round(soc)))] = p; invalidate();
     }
+    synchronized void setPoints(List<ChargeSessionTracker.Point> values) {
+        points.clear();
+        java.util.Arrays.fill(socPower, Float.NaN);
+        for (ChargeSessionTracker.Point value : values) {
+            if (value.socPercent == null) continue;
+            points.add(new float[]{value.socPercent, value.powerKw});
+            socPower[Math.max(0, Math.min(100, Math.round(value.socPercent)))] = value.powerKw;
+        }
+        invalidate();
+    }
     synchronized String tableText() {
         StringBuilder out = new StringBuilder("SOC       Şarj gücü\n");
         boolean found = false;

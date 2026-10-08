@@ -11,6 +11,8 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /** Best-effort MongoDB sync through the API in server/. Never blocks local persistence. */
@@ -20,16 +22,18 @@ final class ConsumptionCloudClient {
     private static final int TIMEOUT_MS = 8_000;
     private static final String PREFS = "consumption_cloud";
     private static final String INSTALLATION_ID = "installation_id";
+    private static final String LAST_CONSUMPTION_DATE = "last_consumption_date";
 
     private final String endpoint;
     private final String token;
     private final String installationId;
+    private final SharedPreferences prefs;
     private long lastAttemptMs;
 
     ConsumptionCloudClient(Context context) {
         endpoint = BuildConfig.CONSUMPTION_API_URL.trim();
         token = BuildConfig.CONSUMPTION_API_TOKEN.trim();
-        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String existing = prefs.getString(INSTALLATION_ID, "");
         if (existing == null || existing.isEmpty()) {
             existing = UUID.randomUUID().toString();
@@ -38,19 +42,55 @@ final class ConsumptionCloudClient {
         installationId = existing;
     }
 
-    void syncIfDue(ConsumptionTracker.CloudSnapshot snapshot, long nowMs) {
+    void syncIfDue(ConsumptionTracker tracker, ChargeSessionTracker charges, long nowMs) {
         if (endpoint.isEmpty() || token.isEmpty() || nowMs - lastAttemptMs < SYNC_INTERVAL_MS) return;
         lastAttemptMs = nowMs;
+        try {
+            syncDailyConsumption(tracker, nowMs);
+            syncPendingCharges(charges);
+        } catch (Exception e) {
+            Log.w(TAG, "Cloud sync unavailable");
+        }
+    }
+
+    private void syncDailyConsumption(ConsumptionTracker tracker, long nowMs) throws Exception {
+        String saved = prefs.getString(LAST_CONSUMPTION_DATE, "");
+        LocalDate lastUploaded = null;
+        try { if (saved != null && !saved.isEmpty()) lastUploaded = LocalDate.parse(saved); }
+        catch (RuntimeException ignored) { }
+        LocalDate target = tracker.nextStoredDayAfter(lastUploaded);
+        if (target == null) return;
+        ConsumptionTracker.CloudSnapshot snapshot = tracker.cloudSnapshot(target);
+        JSONObject body = new JSONObject()
+                .put("installationId", installationId)
+                .put("recordedAt", nowMs)
+                .put("date", snapshot.date)
+                .put("day", totals(snapshot.day))
+                .put("lifetime", totals(snapshot.lifetime));
+        if (snapshot.sohPercent != null) body.put("sohPercent", snapshot.sohPercent);
+        if (send("/v1/consumption/daily", "PUT", body)) {
+            prefs.edit().putString(LAST_CONSUMPTION_DATE, target.toString()).commit();
+        }
+    }
+
+    private void syncPendingCharges(ChargeSessionTracker charges) throws Exception {
+        List<JSONObject> pending = charges.pendingUploads();
+        int sent = 0;
+        for (JSONObject session : pending) {
+            JSONObject body = new JSONObject(session.toString()).put("installationId", installationId);
+            String id = session.getString("sessionId");
+            if (!send("/v1/charging-sessions/" + id, "PUT", body)) return;
+            charges.markUploaded(id);
+            if (++sent >= 3) return;
+        }
+    }
+
+    private boolean send(String path, String method, JSONObject body) throws Exception {
         HttpURLConnection connection = null;
         try {
-            JSONObject body = new JSONObject()
-                    .put("installationId", installationId)
-                    .put("recordedAt", nowMs)
-                    .put("lifetime", totals(snapshot.lifetime));
-            if (snapshot.sohPercent != null) body.put("sohPercent", snapshot.sohPercent);
             byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
-            connection = (HttpURLConnection) new URL(trimSlash(endpoint) + "/v1/consumption").openConnection();
-            connection.setRequestMethod("PUT");
+            connection = (HttpURLConnection) new URL(trimSlash(endpoint) + path).openConnection();
+            connection.setRequestMethod(method);
             connection.setConnectTimeout(TIMEOUT_MS);
             connection.setReadTimeout(TIMEOUT_MS);
             connection.setDoOutput(true);
@@ -59,11 +99,13 @@ final class ConsumptionCloudClient {
             connection.setRequestProperty("Authorization", "Bearer " + token);
             try (OutputStream out = connection.getOutputStream()) { out.write(bytes); }
             int status = connection.getResponseCode();
-            try (InputStream ignored = status < 400
-                    ? connection.getInputStream() : connection.getErrorStream()) { }
-            if (status < 200 || status >= 300) Log.w(TAG, "Sync rejected with HTTP " + status);
-        } catch (Exception e) {
-            Log.w(TAG, "Consumption sync unavailable");
+            InputStream response = status < 400 ? connection.getInputStream() : connection.getErrorStream();
+            if (response != null) try (InputStream ignored = response) { }
+            if (status < 200 || status >= 300) {
+                Log.w(TAG, "Sync rejected with HTTP " + status);
+                return false;
+            }
+            return true;
         } finally {
             if (connection != null) connection.disconnect();
         }

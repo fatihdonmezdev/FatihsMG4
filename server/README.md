@@ -1,7 +1,8 @@
 # FatihsMG4 consumption API
 
 The Android app never connects to MongoDB directly and never contains a MongoDB URI. This
-service accepts authenticated all-time totals and upserts them into the `consumption` collection.
+service stores completed daily totals in `daily_consumption` and each completed charge,
+including its SOC/power curve and price, in `charging_sessions`.
 
 ## Run
 
@@ -17,5 +18,10 @@ service accepts authenticated all-time totals and upserts them into the `consump
    ```
 
 If either Android build variable is missing, cloud sync is disabled and local consumption
-tracking continues unchanged. MongoDB receives one continuously updated document per installation,
-containing all-time `km`, `kwh`, `hours`, and `socDrop` totals plus the manually entered `sohPercent`.
+tracking continues unchanged. The car retries locally queued charging sessions every five minutes.
+Daily consumption is uploaded once after the day closes; missed days are retried in order.
+
+The future mobile client can read authenticated history from:
+
+- `GET /v1/consumption/:installationId`
+- `GET /v1/charging-sessions/:installationId`

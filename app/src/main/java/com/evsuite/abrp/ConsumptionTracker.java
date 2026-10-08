@@ -139,15 +139,35 @@ final class ConsumptionTracker {
         return loadTotals(dayKey(date));
     }
 
-    synchronized CloudSnapshot cloudSnapshot() {
-        return new CloudSnapshot(lifetime.snapshot(), sohPercent());
+    synchronized CloudSnapshot cloudSnapshot(LocalDate date) {
+        rollDayIfNeeded();
+        return new CloudSnapshot(date.toString(), totalsForDay(date), lifetime.snapshot(), sohPercent());
+    }
+
+    synchronized LocalDate nextStoredDayAfter(LocalDate lastUploaded) {
+        rollDayIfNeeded();
+        LocalDate latestComplete = LocalDate.now().minusDays(1);
+        LocalDate best = null;
+        for (String key : prefs.getAll().keySet()) {
+            if (!key.startsWith("day_") || key.length() < 14) continue;
+            try {
+                LocalDate date = LocalDate.parse(key.substring(4, 14));
+                if (date.isAfter(latestComplete) || (lastUploaded != null && !date.isAfter(lastUploaded))) continue;
+                if (best == null || date.isBefore(best)) best = date;
+            } catch (RuntimeException ignored) { }
+        }
+        return best;
     }
 
     static final class CloudSnapshot {
+        final String date;
+        final Totals day;
         final Totals lifetime;
         final Float sohPercent;
 
-        CloudSnapshot(Totals lifetime, Float sohPercent) {
+        CloudSnapshot(String date, Totals day, Totals lifetime, Float sohPercent) {
+            this.date = date;
+            this.day = day;
             this.lifetime = lifetime;
             this.sohPercent = sohPercent;
         }

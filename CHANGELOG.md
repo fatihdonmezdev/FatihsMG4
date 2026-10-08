@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.35
+
+- Added persistent charging sessions with SOC/power curves, duration, energy, unit price,
+  and total cost.
+- Added an offline queue that retries completed charging sessions when connectivity returns.
+- Added once-daily MongoDB consumption history with ordered catch-up after offline periods.
+- Added authenticated history endpoints for a future personal mobile client.
+
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).

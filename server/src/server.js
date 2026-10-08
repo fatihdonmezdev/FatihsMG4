@@ -11,11 +11,15 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("PORT i
 
 const client = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 10_000 });
 await client.connect();
-const collection = client.db(databaseName).collection("consumption");
-await collection.createIndex({ installationId: 1 }, { unique: true });
-await collection.createIndex({ updatedAt: -1 });
+const database = client.db(databaseName);
+const consumptionCollection = database.collection("daily_consumption");
+const chargingCollection = database.collection("charging_sessions");
+await consumptionCollection.createIndex({ installationId: 1, date: 1 }, { unique: true });
+await consumptionCollection.createIndex({ installationId: 1, date: -1 });
+await chargingCollection.createIndex({ installationId: 1, sessionId: 1 }, { unique: true });
+await chargingCollection.createIndex({ installationId: 1, startedAt: -1 });
 
-const app = createApp({ collection, apiToken: API_TOKEN });
+const app = createApp({ consumptionCollection, chargingCollection, apiToken: API_TOKEN });
 const server = app.listen(port, () => console.log(`FatihsMG4 API listening on ${port}`));
 
 async function shutdown() {
