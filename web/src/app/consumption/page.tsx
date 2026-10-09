@@ -28,7 +28,8 @@ export default async function ConsumptionPage({
 
   const chartDays = days.map((day) => ({ date: day.date, kwh: day.day.kwh, km: day.day.km }));
   const total = sumDays(days);
-  const lifetime = days[days.length - 1].lifetime;
+  // Lifetime is derived: the sum of every day's totals, same as the backend computes.
+  const lifetime = { km: total.km, kwh: total.kwh, hours: total.hours, socDrop: 0 };
   // Newest first for reading; the charts above keep chronological order.
   const table = [...days].reverse();
 
@@ -91,7 +92,7 @@ export default async function ConsumptionPage({
               <div className="rows">
                 <Row label="Sürüş süresi" value={duration(selected.day.hours * 3600)} />
                 <Row label="Doluluk düşüşü" value={`%${num(selected.day.socDrop)}`} />
-                <Row label="O gün sonu ömür boyu" value={`${num(selected.lifetime.km)} km`} />
+                <Row label="O gün sonu ömür boyu" value={selected.lifetime ? `${num(selected.lifetime.km)} km` : "—"} />
               </div>
             </>
           ) : (
@@ -163,7 +164,7 @@ export default async function ConsumptionPage({
                         value={day.day.hours > 0 ? `${num(day.day.km / day.day.hours)} km/h` : "—"}
                       />
                       <Row label="Doluluk düşüşü" value={`%${num(day.day.socDrop)}`} />
-                      <Row label="O gün sonu ömür boyu" value={`${num(day.lifetime.km)} km`} />
+                      <Row label="O gün sonu ömür boyu" value={day.lifetime ? `${num(day.lifetime.km)} km` : "—"} />
                     </div>
                   </div>
                 </details>
