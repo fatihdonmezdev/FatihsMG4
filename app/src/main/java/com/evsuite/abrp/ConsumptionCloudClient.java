@@ -88,7 +88,7 @@ final class ConsumptionCloudClient {
     void syncIfDue(ConsumptionTracker tracker, ChargeSessionTracker charges, long nowMs) {
         long elapsed = android.os.SystemClock.elapsedRealtime();
         if (endpoint.isEmpty() || token.isEmpty()) {
-            Log.d(TAG, "Sync skipped: API not configured");
+            Log.i(TAG, "Sync skipped: API not configured");
             return;
         }
         syncPendingChargesIfDue(charges, elapsed);
@@ -107,10 +107,10 @@ final class ConsumptionCloudClient {
 
         ConsumptionTracker.CloudSnapshot chunk = tracker.takeChunkDelta();
         if (chunk == null) {
-            Log.d(TAG, "Sync due but no new consumption since last chunk");
+            Log.i(TAG, "Sync due but no new consumption since last chunk");
             return;  // no driving since the last chunk
         }
-        Log.d(TAG, "New chunk for " + chunk.date + ": +" + String.format("%.1f", chunk.day.km)
+        Log.i(TAG, "New chunk for " + chunk.date + ": +" + String.format("%.1f", chunk.day.km)
                 + "km, +" + String.format("%.2f", chunk.day.kwh) + "kWh");
         try {
             JSONObject body = consumptionBody(chunk, nowMs);
@@ -153,7 +153,7 @@ final class ConsumptionCloudClient {
                 String date = body.optString("date", "?");
                 if (send("/v1/consumption/daily", "PUT", body)) {
                     sent++;
-                    Log.d(TAG, "Cached chunk for " + date + " sent");
+                    Log.i(TAG, "Cached chunk for " + date + " sent");
                 } else {
                     // Server rejected — keep it, try the next one too.
                     remaining.put(body);
@@ -227,16 +227,16 @@ final class ConsumptionCloudClient {
 
     private void syncPendingCharges(ChargeSessionTracker charges, List<JSONObject> pending)
             throws Exception {
-        Log.d(TAG, "Found " + pending.size() + " pending charge sessions");
+        Log.i(TAG, "Found " + pending.size() + " pending charge sessions");
         int sent = 0;
         for (JSONObject session : pending) {
             JSONObject body = new JSONObject(session.toString()).put("installationId", installationId);
             String id = session.getString("sessionId");
-            Log.d(TAG, "Uploading charge session: " + id);
+            Log.i(TAG, "Uploading charge session: " + id);
             if (send("/v1/charging-sessions/" + id, "PUT", body)) {
                 charges.markUploaded(id);
                 logEvent(true, 200, "Şarj session gönderildi: " + id);
-                Log.d(TAG, "Successfully uploaded charge session: " + id);
+                Log.i(TAG, "Successfully uploaded charge session: " + id);
             } else {
                 logEvent(false, 0, "Şarj session gönderilemedi: " + id);
                 Log.w(TAG, "Failed to upload charge session: " + id);
@@ -251,7 +251,8 @@ final class ConsumptionCloudClient {
         try {
             byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
             String url = trimSlash(endpoint) + path;
-            Log.d(TAG, "Sending " + method + " request to " + url + " (" + bytes.length + " bytes)");
+            Log.i(TAG, "Sending " + method + " request to " + url + " (" + bytes.length + " bytes)");
+            Log.i(TAG, "Body: " + body.toString());
             connection = (HttpURLConnection) new URL(url).openConnection();
             connection.setRequestMethod(method);
             connection.setConnectTimeout(TIMEOUT_MS);
@@ -262,7 +263,7 @@ final class ConsumptionCloudClient {
             connection.setRequestProperty("Authorization", "Bearer " + token);
             try (OutputStream out = connection.getOutputStream()) { out.write(bytes); }
             int status = connection.getResponseCode();
-            Log.d(TAG, "Response: HTTP " + status);
+            Log.i(TAG, "Response: HTTP " + status);
             if (status < 200 || status >= 300) {
                 String errBody = readErrorBody(connection);
                 Log.w(TAG, "Sync rejected with HTTP " + status + (errBody.isEmpty() ? "" : ": " + errBody));
@@ -308,7 +309,7 @@ final class ConsumptionCloudClient {
         try {
             List<DayRecord> fresh = fetchHistory();
             if (!fresh.isEmpty()) cachedHistory = fresh;
-            Log.d(TAG, "Fetched " + fresh.size() + " history records from cloud");
+            Log.i(TAG, "Fetched " + fresh.size() + " history records from cloud");
             logEvent(true, 200, "History çekildi: " + fresh.size() + " gün");
         } catch (Exception e) {
             String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
@@ -363,7 +364,7 @@ final class ConsumptionCloudClient {
             connection.setReadTimeout(TIMEOUT_MS);
             connection.setRequestProperty("Authorization", "Bearer " + token);
             int status = connection.getResponseCode();
-            Log.d(TAG, "History GET response: HTTP " + status);
+            Log.i(TAG, "History GET response: HTTP " + status);
             if (status < 200 || status >= 300) {
                 String err = readErrorBody(connection);
                 Log.w(TAG, "History fetch rejected with HTTP " + status + (err.isEmpty() ? "" : ": " + err));

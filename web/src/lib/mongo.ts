@@ -22,7 +22,8 @@ export interface DailyConsumption {
   date: string;
   recordedAt: Date;
   day: Totals;
-  lifetime: Totals;
+  /** Optional — the backend derives lifetime as the sum of all days' totals. */
+  lifetime?: Totals;
   sohPercent?: number;
   createdAt: Date;
   updatedAt: Date;

@@ -21,12 +21,15 @@ export function validateConsumption(body: unknown): ConsumptionInput {
   const date = record.date;
   if (typeof date !== "string" || !ISO_DATE.test(date)) throw new ValidationError("date is invalid");
   const sohPercent = record.sohPercent;
+  const lifetime = record.lifetime;
   return {
     installationId: validateUuid(record.installationId, "installationId"),
     date,
     recordedAt: validateDate(record.recordedAt, "recordedAt"),
     day: validateTotals(record.day, "day"),
-    lifetime: validateTotals(record.lifetime, "lifetime"),
+    // Lifetime is optional — the backend derives it from day totals, and the app no longer
+    // sends it. Legacy documents may still carry one; new chunks do not.
+    ...(lifetime === undefined ? {} : { lifetime: validateTotals(lifetime, "lifetime") }),
     ...(sohPercent === undefined ? {} : { sohPercent: bounded(sohPercent, 0, 100, "sohPercent") }),
   };
 }
