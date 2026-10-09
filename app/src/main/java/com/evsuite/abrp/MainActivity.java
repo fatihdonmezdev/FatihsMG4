@@ -215,6 +215,7 @@ public class MainActivity extends AppCompatActivity {
 
         statusText          = servicePane.findViewById(R.id.status_text);
         callLogText = logPane.findViewById(R.id.call_log_text);
+        logPane.findViewById(R.id.flush_now_button).setOnClickListener(v -> manualFlush());
 
         setUpPager();
         findViewById(R.id.about_button).setOnClickListener(v -> showAbout());
@@ -440,6 +441,7 @@ public class MainActivity extends AppCompatActivity {
         consumptionDateButton = consumptionPane.findViewById(R.id.consumption_date_button);
         consumptionDateButton.setText(selectedConsumptionDate.toString());
         consumptionDateButton.setOnClickListener(v -> showConsumptionDatePicker());
+        consumptionPane.findViewById(R.id.consumption_refresh).setOnClickListener(v -> refreshFromCloud());
         consumptionReset = consumptionPane.findViewById(R.id.consumption_reset);
         consumptionSohLayout = consumptionPane.findViewById(R.id.consumption_soh_layout);
         consumptionSohInput = consumptionPane.findViewById(R.id.consumption_soh_input);
@@ -685,6 +687,39 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // ---------- Call log ----------
+
+    /**
+     * "Şimdi yükle" button — forces a cache drain + fresh chunk on a background thread,
+     * ignoring the 2-minute throttle. The result lands in the upload log (Kayıtlar tab).
+     */
+    private void manualFlush() {
+        if (consumptionCloudClient == null || consumptionTracker == null) return;
+        AbrpUploadService.log().record(new UploadLog.Entry(
+                System.currentTimeMillis(), 0, true, "Manuel sync başlatıldı…"));
+        new Thread(() -> {
+            String result = consumptionCloudClient.flushNow(
+                    consumptionTracker, System.currentTimeMillis());
+            runOnUiThread(() -> Toast.makeText(this, result, Toast.LENGTH_SHORT).show());
+        }, "manual-flush").start();
+    }
+
+    /**
+     * Tüketim sekmesi "Yenile" button — sends cached chunks + fresh delta, invalidates the
+     * history cache so the next poll fetches fresh data from the cloud, then refreshes the UI.
+     */
+    private void refreshFromCloud() {
+        if (consumptionCloudClient == null || consumptionTracker == null) return;
+        AbrpUploadService.log().record(new UploadLog.Entry(
+                System.currentTimeMillis(), 0, true, "Tüketim yenileniyor…"));
+        new Thread(() -> {
+            consumptionCloudClient.flushNow(consumptionTracker, System.currentTimeMillis());
+            consumptionCloudClient.invalidateHistory();
+            runOnUiThread(() -> {
+                refreshConsumption();
+                Toast.makeText(this, "Tüketim yenilendi", Toast.LENGTH_SHORT).show();
+            });
+        }, "cloud-refresh").start();
+    }
 
     private void refreshCallLog() {
         java.util.List<UploadLog.Entry> entries = AbrpUploadService.log().recent();

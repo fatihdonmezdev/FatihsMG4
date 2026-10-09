@@ -2,6 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:clipToPadding="false">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="24dp" android:background="@drawable/bg_glass">
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/label_call_log" android:textAppearance="@style/Text.EV.Eyebrow" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/flush_now_button" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="@string/btn_flush_now" app:icon="@drawable/ic_refresh" app:iconGravity="textStart" style="@style/Widget.EV.Button.Outlined" xmlns:app="http://schemas.android.com/apk/res-auto" />
         <TextView android:id="@+id/call_log_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp" android:minHeight="180dp" android:text="@string/call_log_empty" android:textAppearance="@style/Text.EV.Body" android:fontFamily="monospace" android:textSize="17sp" android:lineSpacingExtra="12dp" android:textIsSelectable="true" />
     </LinearLayout>
 </ScrollView>

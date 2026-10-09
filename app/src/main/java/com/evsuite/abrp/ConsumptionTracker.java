@@ -3,6 +3,7 @@ package com.evsuite.abrp;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.SystemClock;
+import android.util.Log;
 
 import com.evsuite.hardware.telemetry.EnergySnapshot;
 
@@ -204,6 +205,22 @@ final class ConsumptionTracker {
         return missing ? lifetime.snapshot() : stored;
     }
 
+    /**
+     * Sets the local lifetime baseline from the cloud's last known lifetime, but only when
+     * the cloud value is higher — an APK wipe zeroes the local counter, and without this the
+     * car would re-upload a small lifetime that overwrites the real one in the cloud.
+     * Called once after the first history fetch succeeds.
+     */
+    synchronized void syncLifetimeBaseline(Totals cloudLifetime) {
+        Totals local = lifetime.snapshot();
+        if (cloudLifetime.km > local.km) {
+            lifetime.set(cloudLifetime.km, cloudLifetime.kwh, cloudLifetime.hours, cloudLifetime.soc);
+            persist();
+            Log.i("FatihsMG4.Consumption", "Lifetime baseline synced from cloud: "
+                    + cloudLifetime.km + " km (was " + local.km + " km)");
+        }
+    }
+
     synchronized LocalDate nextStoredDayAfter(LocalDate lastUploaded) {
         rollDayIfNeeded();
         LocalDate latestComplete = LocalDate.now().minusDays(1);
@@ -353,6 +370,13 @@ final class ConsumptionTracker {
 
         void reset() {
             km.reset(); kwh.reset(); hours.reset(); soc.reset();
+        }
+
+        void set(double kmVal, double kwhVal, double hoursVal, double socVal) {
+            km.setTotal(kmVal);
+            kwh.setTotal(kwhVal);
+            hours.setTotal(hoursVal);
+            soc.setTotal(socVal);
         }
 
         Totals snapshot() {

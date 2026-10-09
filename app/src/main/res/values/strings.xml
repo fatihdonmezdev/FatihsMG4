@@ -107,6 +107,7 @@
     <!-- Call log -->
     <string name="label_call_log">Recent uploads</string>
     <string name="call_log_empty">No upload attempted yet.</string>
+    <string name="btn_flush_now">Şimdi yükle</string>
     <string name="status_starting">Starting…</string>
     <string name="status_running_no_upload">Running — waiting for first upload</string>
     <string name="status_last_upload">Last upload: %1$s (%2$s)</string>

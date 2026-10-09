@@ -29,7 +29,7 @@ import java.util.List;
  */
 final class ConsumptionCloudClient {
     private static final String TAG = "FatihsMG4.Mongo";
-    private static final long CONSUMPTION_SYNC_INTERVAL_MS = 30 * 60_000L;
+    private static final long CONSUMPTION_SYNC_INTERVAL_MS = 2 * 60_000L;
     private static final long CHARGE_RETRY_INTERVAL_MS = 5 * 60_000L;
     private static final long HISTORY_FETCH_INTERVAL_MS = 5 * 60_000L;
     private static final int TIMEOUT_MS = 8_000;
@@ -137,14 +137,16 @@ final class ConsumptionCloudClient {
     }
 
     /**
-     * Sends every cached chunk; removes each one that succeeds. Returns how many were sent.
-     * A chunk that fails stops the drain — the rest stay in order for the next cycle.
+     * Sends every cached chunk; removes each one that succeeds. A chunk that fails stays in
+     * the cache for the next attempt, but does NOT stop the drain — the next chunk is tried
+     * too, because a 5xx on one day's document is not a reason to hold back the rest.
      */
     private int drainChunkCache() {
         JSONArray cache = loadChunkCache();
         if (cache.length() == 0) return 0;
         JSONArray remaining = new JSONArray();
         int sent = 0;
+        int failed = 0;
         for (int i = 0; i < cache.length(); i++) {
             try {
                 JSONObject body = cache.getJSONObject(i);
@@ -153,20 +155,18 @@ final class ConsumptionCloudClient {
                     sent++;
                     Log.d(TAG, "Cached chunk for " + date + " sent");
                 } else {
-                    // Server rejected — keep this and everything after it.
-                    for (int j = i; j < cache.length(); j++) remaining.put(cache.get(j));
-                    break;
+                    // Server rejected — keep it, try the next one too.
+                    remaining.put(body);
+                    failed++;
                 }
             } catch (Exception e) {
-                // Network error — keep this and everything after it, stop draining.
-                for (int j = i; j < cache.length(); j++) {
-                    try { remaining.put(cache.get(j)); } catch (Exception ignored) { }
-                }
-                Log.w(TAG, "Cache drain stopped: " + e.getMessage());
-                break;
+                // Network error — keep it, try the next one too.
+                try { remaining.put(cache.get(i)); } catch (Exception ignored) { }
+                failed++;
             }
         }
         saveChunkCache(remaining);
+        if (failed > 0) Log.w(TAG, "Cache drain: " + sent + " sent, " + failed + " still pending");
         return sent;
     }
 
@@ -203,8 +203,7 @@ final class ConsumptionCloudClient {
                 .put("installationId", installationId)
                 .put("recordedAt", nowMs)
                 .put("date", snapshot.date)
-                .put("day", totals(snapshot.day))
-                .put("lifetime", totals(snapshot.lifetime));
+                .put("day", totals(snapshot.day));
         if (snapshot.sohPercent != null) body.put("sohPercent", snapshot.sohPercent);
         return body;
     }
@@ -290,31 +289,68 @@ final class ConsumptionCloudClient {
     /**
      * Returns the cached cloud history, fetching a fresh copy at most every 5 minutes.
      * Called from the UI poll loop (every 2 s), so the throttle is what keeps the head unit
-     * off the network. On a fetch failure the previous cache is kept — a transient outage
-     * must not blank the display.
+     * off the network. The fetch itself runs on a background thread — this method is called
+     * from the UI thread and a network call there throws NetworkOnMainThreadException.
+     * Returns the current cache immediately; the fresh copy lands on the next poll.
      */
-    List<DayRecord> fetchHistoryIfDue() {
+    synchronized List<DayRecord> fetchHistoryIfDue() {
         if (endpoint.isEmpty() || token.isEmpty()) return cachedHistory;
         long elapsed = android.os.SystemClock.elapsedRealtime();
         if (lastHistoryFetchMs != 0L && elapsed - lastHistoryFetchMs < HISTORY_FETCH_INTERVAL_MS) {
             return cachedHistory;
         }
         lastHistoryFetchMs = elapsed;
+        new Thread(this::fetchHistoryAsync, "history-fetch").start();
+        return cachedHistory;
+    }
+
+    private void fetchHistoryAsync() {
         try {
             List<DayRecord> fresh = fetchHistory();
             if (!fresh.isEmpty()) cachedHistory = fresh;
             Log.d(TAG, "Fetched " + fresh.size() + " history records from cloud");
+            logEvent(true, 200, "History çekildi: " + fresh.size() + " gün");
         } catch (Exception e) {
             String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             Log.w(TAG, "History fetch unavailable: " + msg);
             logEvent(false, 0, "History fetch hatası: " + msg);
         }
-        return cachedHistory;
     }
 
     /** Forces a refresh on the next {@link #fetchHistoryIfDue} — call after an upload. */
     void invalidateHistory() {
         lastHistoryFetchMs = 0L;
+    }
+
+    /**
+     * Immediately attempts to send every cached chunk and take a fresh one, ignoring the
+     * 2-minute throttle. Called from the UI "Şimdi yükle" button. Returns a one-line
+     * status for the log.
+     */
+    String flushNow(ConsumptionTracker tracker, long nowMs) {
+        if (endpoint.isEmpty() || token.isEmpty()) return "API yapılandırılmamış";
+        int cached = drainChunkCache();
+        ConsumptionTracker.CloudSnapshot chunk = tracker.takeChunkDelta();
+        int total = cached;
+        if (chunk != null) {
+            try {
+                JSONObject body = consumptionBody(chunk, nowMs);
+                if (send("/v1/consumption/daily", "PUT", body)) {
+                    total++;
+                    invalidateHistory();
+                } else {
+                    cacheChunk(body);
+                }
+            } catch (Exception e) {
+                try { cacheChunk(consumptionBody(chunk, nowMs)); } catch (Exception ignored) { }
+            }
+        }
+        int pending = pendingChunkCount();
+        String msg = total > 0
+                ? total + " chunk yüklendi" + (pending > 0 ? ", " + pending + " hâlâ bekliyor" : "")
+                : (pending > 0 ? pending + " chunk yüklenemedi (internet?)" : "Yüklenecek yeni veri yok");
+        logEvent(total > 0, total > 0 ? 200 : 0, "Manuel sync: " + msg);
+        return msg;
     }
 
     private List<DayRecord> fetchHistory() throws Exception {
@@ -327,23 +363,29 @@ final class ConsumptionCloudClient {
             connection.setReadTimeout(TIMEOUT_MS);
             connection.setRequestProperty("Authorization", "Bearer " + token);
             int status = connection.getResponseCode();
+            Log.d(TAG, "History GET response: HTTP " + status);
             if (status < 200 || status >= 300) {
-                Log.w(TAG, "History fetch rejected with HTTP " + status);
+                String err = readErrorBody(connection);
+                Log.w(TAG, "History fetch rejected with HTTP " + status + (err.isEmpty() ? "" : ": " + err));
+                logEvent(false, status, "History GET HTTP " + status + (err.isEmpty() ? "" : " — " + err));
                 return cachedHistory;
             }
             String body = readBody(connection);
             JSONObject json = new JSONObject(body);
             JSONArray records = json.optJSONArray("records");
             if (records == null) return Collections.emptyList();
+            // Lifetime is derived by the backend (sum of all days), sent once at the response
+            // level. Each DayRecord carries it so the UI's LIFETIME period can read it.
+            ConsumptionTracker.Totals lifetime = json.has("lifetime") && !json.isNull("lifetime")
+                    ? parseTotals(json.getJSONObject("lifetime")) : null;
             List<DayRecord> result = new ArrayList<>(records.length());
             for (int i = 0; i < records.length(); i++) {
                 JSONObject r = records.getJSONObject(i);
                 LocalDate date = LocalDate.parse(r.getString("date"));
                 ConsumptionTracker.Totals day = parseTotals(r.getJSONObject("day"));
-                ConsumptionTracker.Totals life = parseTotals(r.getJSONObject("lifetime"));
                 Float soh = r.has("sohPercent") && !r.isNull("sohPercent")
                         ? (float) r.getDouble("sohPercent") : null;
-                result.add(new DayRecord(date, day, life, soh));
+                result.add(new DayRecord(date, day, lifetime, soh));
             }
             return result;
         } finally {

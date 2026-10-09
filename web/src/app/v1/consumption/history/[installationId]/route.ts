@@ -27,6 +27,17 @@ export async function GET(request: Request, context: { params: Promise<{ install
       .sort({ date: -1 })
       .limit(400)
       .toArray();
-    return NextResponse.json({ records });
+    // Lifetime = sum of every day's totals. Derived, never stored, so a corrupted or
+    // stale lifetime field in any single document cannot poison the total.
+    const lifetime = records.reduce(
+      (sum, r) => ({
+        km: sum.km + (r.day?.km ?? 0),
+        kwh: sum.kwh + (r.day?.kwh ?? 0),
+        hours: sum.hours + (r.day?.hours ?? 0),
+        socDrop: sum.socDrop + (r.day?.socDrop ?? 0),
+      }),
+      { km: 0, kwh: 0, hours: 0, socDrop: 0 },
+    );
+    return NextResponse.json({ records, lifetime });
   });
 }
