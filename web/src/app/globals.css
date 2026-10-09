@@ -362,3 +362,69 @@ a {
   padding: 5px 12px;
   cursor: pointer;
 }
+
+/* ---------- Consumption date filter ---------- */
+
+.filter-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.filter-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.date-input {
+  width: auto;
+  min-width: 0;
+  flex: 1 1 150px;
+  margin-top: 0;
+  color-scheme: dark;
+}
+
+.filter-button {
+  width: auto;
+  margin-top: 0;
+  padding: 12px 18px;
+  flex: 0 0 auto;
+}
+
+.filter-clear {
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  border: 1px solid var(--outline);
+  border-radius: 12px;
+  padding: 11px 14px;
+  flex: 0 0 auto;
+}
+
+.filter-clear:active {
+  border-color: var(--accent);
+}
+
+/* Highlighted selected day in the day-by-day list */
+.session.selected {
+  border-color: var(--accent);
+}
+
+.day-link {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.day-link:active {
+  color: var(--accent);
+}
