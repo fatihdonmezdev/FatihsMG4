@@ -35,6 +35,8 @@ final class ConsumptionTracker {
     private static final String PREFS = "consumption_counters_v2";
     private static final String LEGACY_PREFS = "consumption_counters_v1";
     private static final String SOH_PERCENT = "manual_soh_percent";
+    /** Snapshot of today's counter at the last chunk send — the baseline for the next delta. */
+    private static final String CHUNK_CHECKPOINT = "chunk_checkpoint_";
 
     /** How often the in-memory accumulators reach disk. Matches DriveHub_Dort. */
     private static final long PERSIST_INTERVAL_MS = 30_000L;
@@ -51,6 +53,8 @@ final class ConsumptionTracker {
     private final Counter tripB = new Counter();
     private final Counter today = new Counter();
     private LocalDate todayDate;
+    /** Today's totals as of the last chunk send, per field. Delta = today - this. */
+    private double chunkCpKm, chunkCpKwh, chunkCpHours, chunkCpSoc;
 
     /**
      * Monotonic. {@code EnergySnapshot.timestampMs} is wall clock, and the head unit's
@@ -70,6 +74,7 @@ final class ConsumptionTracker {
         tripB.load(prefs, "b");
         todayDate = LocalDate.now();
         today.load(prefs, dayKey(todayDate));
+        loadChunkCheckpoint();
         pruneOldDays();
     }
 
@@ -148,6 +153,49 @@ final class ConsumptionTracker {
         return new CloudSnapshot(date.toString(), totalsForDay(date), lifetimeAtEndOf(date), sohPercent());
     }
 
+    /**
+     * The delta accumulated since the last chunk send — what a 30-minute consumption chunk
+     * should carry. Returns null when nothing has accumulated (no driving in this window).
+     * Calling this advances the checkpoint, so the same delta is never sent twice.
+     */
+    synchronized CloudSnapshot takeChunkDelta() {
+        rollDayIfNeeded();
+        Totals current = today.snapshot();
+        double dKm = current.km - chunkCpKm;
+        double dKwh = current.kwh - chunkCpKwh;
+        double dHours = current.hours - chunkCpHours;
+        double dSoc = current.soc - chunkCpSoc;
+        if (Math.abs(dKm) < 0.001 && Math.abs(dKwh) < 0.001
+                && Math.abs(dHours) < 0.001 && Math.abs(dSoc) < 0.001) {
+            return null;  // nothing new since the last chunk
+        }
+        saveChunkCheckpoint(current);
+        Totals delta = new Totals(dKm, dKwh, dHours, dSoc);
+        return new CloudSnapshot(todayDate.toString(), delta, lifetime.snapshot(), sohPercent());
+    }
+
+    private void loadChunkCheckpoint() {
+        String p = CHUNK_CHECKPOINT + todayDate;
+        chunkCpKm = bits(p, "km");
+        chunkCpKwh = bits(p, "kwh");
+        chunkCpHours = bits(p, "h");
+        chunkCpSoc = bits(p, "soc");
+    }
+
+    private void saveChunkCheckpoint(Totals current) {
+        chunkCpKm = current.km;
+        chunkCpKwh = current.kwh;
+        chunkCpHours = current.hours;
+        chunkCpSoc = current.soc;
+        String p = CHUNK_CHECKPOINT + todayDate;
+        SharedPreferences.Editor e = prefs.edit();
+        e.putLong(p + "_km", Double.doubleToRawLongBits(current.km));
+        e.putLong(p + "_kwh", Double.doubleToRawLongBits(current.kwh));
+        e.putLong(p + "_h", Double.doubleToRawLongBits(current.hours));
+        e.putLong(p + "_soc", Double.doubleToRawLongBits(current.soc));
+        e.commit();
+    }
+
     /** Lifetime as of the close of {@code date}, falling back to the live counter. */
     private Totals lifetimeAtEndOf(LocalDate date) {
         if (date.equals(todayDate)) return lifetime.snapshot();
@@ -201,6 +249,7 @@ final class ConsumptionTracker {
         persist();
         todayDate = date;
         today.load(prefs, dayKey(date));
+        loadChunkCheckpoint();  // new day → fresh checkpoint baseline
         pruneOldDays();
     }
 

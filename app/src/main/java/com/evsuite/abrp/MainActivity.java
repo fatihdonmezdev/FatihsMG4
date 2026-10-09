@@ -1,6 +1,5 @@
 package com.evsuite.abrp;
 
-import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -9,21 +8,17 @@ import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.Toast;
 import android.widget.ImageView;
-import android.widget.Spinner;
 import android.widget.TextView;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
+import java.time.LocalDate;
+import java.util.List;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 
@@ -32,30 +27,27 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
-import com.evsuite.hardware.EVHardware;
-import com.evsuite.hardware.FirmwareInfo;
 import com.evsuite.hardware.telemetry.EnergySnapshot;
 import com.evsuite.hardware.telemetry.EnergyTelemetryReader;
 
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int LOCATION_PERMISSION_REQUEST = 100;
     /** Shared with {@link AbrpUploadService}, which reads it on every tick. */
     static final String WIFI_AUTO_KEY = "wifi_auto_connect";
     private static final String REPOSITORY_URL = "https://github.com/fatihdonmezdev/FatihsMG4";
 
     /** Navigation destinations in page order. Parallel to {@link #panes}. */
     private static final int[] TAB_IDS =
-            { R.id.tabVehicle, R.id.tabConsumption, R.id.tabCharging, R.id.tabAbrp, R.id.tabService, R.id.tabWifi,
+            { R.id.tabVehicle, R.id.tabConsumption, R.id.tabCharging, R.id.tabService, R.id.tabWifi,
               R.id.tabLog };
 
     private static final int[] PAGE_TITLES = {
-            R.string.design_overview_title, R.string.consumption_title, R.string.charging_title, R.string.design_abrp_title,
+            R.string.design_overview_title, R.string.consumption_title, R.string.charging_title,
             R.string.design_service_title, R.string.design_wifi_title, R.string.design_log_title
     };
     private static final int[] PAGE_SUBTITLES = {
-            R.string.design_overview_subtitle, R.string.consumption_subtitle, R.string.charging_subtitle, R.string.design_abrp_subtitle,
+            R.string.design_overview_subtitle, R.string.consumption_subtitle, R.string.charging_subtitle,
             R.string.design_service_subtitle, R.string.design_wifi_subtitle, R.string.design_log_subtitle
     };
 
@@ -66,24 +58,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int COLOR_ERROR   = 0xFFFFB4AB;
     private static final int COLOR_PENDING = 0xFFBDC4C6;
 
-    private TextInputLayout   apiKeyLayout;
-    private TextInputEditText apiKeyInput;
-    private TextInputLayout   tokenLayout;
-    private TextInputEditText tokenInput;
-    private SwitchMaterial    serviceSwitch;
-    private SwitchMaterial    abrpUploadSwitch;
-    private SwitchMaterial    autostartSwitch;
     private TextView          statusText;
-    private Button            testButton;
-    private View              connectionStatusRow;
-    private View              connectionIndicator;
-    private TextView          connectionStatusText;
-    private Spinner intervalSpinner;
-    private SwitchMaterial boostSwitch;
-    private TextInputEditText lowSocInput;
-    private TextInputLayout lowSocLayout;
     private TextView callLogText;
-    private View abrpPane;
     private View servicePane;
     private View logPane;
     private View vehiclePane;
@@ -91,7 +67,7 @@ public class MainActivity extends AppCompatActivity {
     private View chargingPane;
     private View wifiPane;
 
-    /** The five pages in navigation order. Parallel to {@link #TAB_IDS}. */
+    /** The six pages in navigation order. Parallel to {@link #TAB_IDS}. */
     private View[] panes;
 
     /** Wi-Fi page. The helper is the same one the upload service uses on its own tick. */
@@ -110,6 +86,7 @@ public class MainActivity extends AppCompatActivity {
             vehCharging, vehHvac,
             vehTireFl, vehTireFr, vehTireRl, vehTireRr;
     private ConsumptionTracker consumptionTracker;
+    private ConsumptionCloudClient consumptionCloudClient;
     private ConsumptionTracker.Period consumptionPeriod = ConsumptionTracker.Period.LIFETIME;
     private TextView consumptionDistance, consumptionEnergy, consumptionAverage,
             consumptionSpeed, consumptionTime, consumptionSoc, consumptionDailyHistory;
@@ -162,7 +139,7 @@ public class MainActivity extends AppCompatActivity {
                 // state, exactly as they did when they were siblings in the layout.
             }
         });
-        // Keep all pages alive: the service switch, log and vehicle readings are refreshed
+        // Keep all pages alive: the log and vehicle readings are refreshed
         // by the tick even when their page is off screen.
         pager.setOffscreenPageLimit(panes.length - 1);
         pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
@@ -207,18 +184,6 @@ public class MainActivity extends AppCompatActivity {
     };
 
     private SharedPreferences prefs;
-    /** Credentials only — encrypted at rest, see {@link SecurePrefs}. */
-    private SharedPreferences securePrefs;
-
-    /**
-     * Picks an ABRP config text file. Only reachable on devices that ship a document picker —
-     * the MG4 head unit does not, which is why {@link #startConfigImport()} scans the
-     * app-specific folders first and only falls back to this.
-     */
-    private final ActivityResultLauncher<String[]> configPicker =
-            registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
-                if (uri != null) importConfig(uri);
-            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -229,129 +194,40 @@ public class MainActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.version_badge)).setText("v" + BuildConfig.VERSION_NAME);
 
         prefs = getSharedPreferences("abrp_prefs", MODE_PRIVATE);
-        securePrefs = SecurePrefs.get(this);
 
         // The pages are inflated here, once, and handed to the pager as fixed,
         // non-recycled items. That is what lets every widget below be looked up now and
         // held for the life of the activity, the way it was when the panes were siblings
         // in activity_main.xml — a recycled page would invalidate these references as
         // soon as the user swiped away from it.
-        abrpPane    = inflatePane(R.layout.pane_abrp);
         servicePane = inflatePane(R.layout.pane_service);
         vehiclePane   = inflatePane(R.layout.pane_vehicle);
         consumptionPane = inflatePane(R.layout.pane_consumption);
         chargingPane = inflatePane(R.layout.pane_charging);
         wifiPane    = inflatePane(R.layout.pane_wifi);
         logPane     = inflatePane(R.layout.pane_log);
-        panes = new View[] { vehiclePane, consumptionPane, chargingPane, abrpPane, servicePane, wifiPane, logPane };
+        panes = new View[] { vehiclePane, consumptionPane, chargingPane, servicePane, wifiPane, logPane };
 
         bindVehiclePane();
         bindConsumptionPane();
         bindChargingPane();
         bindWifiPane();
 
-        apiKeyLayout        = abrpPane.findViewById(R.id.api_key_layout);
-        apiKeyInput         = abrpPane.findViewById(R.id.api_key_input);
-        tokenLayout         = abrpPane.findViewById(R.id.token_layout);
-        tokenInput          = abrpPane.findViewById(R.id.token_input);
-        serviceSwitch       = servicePane.findViewById(R.id.service_switch);
-        abrpUploadSwitch    = servicePane.findViewById(R.id.abrp_upload_switch);
-        autostartSwitch     = servicePane.findViewById(R.id.autostart_switch);
         statusText          = servicePane.findViewById(R.id.status_text);
-        testButton          = abrpPane.findViewById(R.id.test_button);
-        connectionStatusRow = abrpPane.findViewById(R.id.connection_status_row);
-        connectionIndicator = abrpPane.findViewById(R.id.connection_indicator);
-        connectionStatusText = abrpPane.findViewById(R.id.connection_status_text);
-        intervalSpinner = servicePane.findViewById(R.id.interval_spinner);
-        boostSwitch = servicePane.findViewById(R.id.boost_switch);
-        lowSocInput = servicePane.findViewById(R.id.low_soc_input);
-        lowSocLayout = servicePane.findViewById(R.id.low_soc_layout);
         callLogText = logPane.findViewById(R.id.call_log_text);
 
         setUpPager();
         findViewById(R.id.about_button).setOnClickListener(v -> showAbout());
         findViewById(R.id.update_button).setOnClickListener(v -> checkForUpdate(v));
 
-        bindCadenceControls();
-
         // Unstable builds check for a newer pre-release; the stable flavor's UpdateHook is
         // a no-op and does not even contain the updater.
         UpdateHook.checkInBackground(this);
 
-        apiKeyInput.setText(savedApiKeyOrDefault());
-        tokenInput.setText(securePrefs.getString(SecurePrefs.KEY_TOKEN, ""));
-        serviceSwitch.setChecked(prefs.getBoolean("service_enabled", false));
-        abrpUploadSwitch.setChecked(prefs.getBoolean(
-                UploadSettings.KEY_ABRP_UPLOAD_ENABLED,
-                UploadSettings.DEFAULT_ABRP_UPLOAD_ENABLED));
-
-        autostartSwitch.setChecked(
-                prefs.getBoolean(UploadSettings.KEY_AUTOSTART, UploadSettings.DEFAULT_AUTOSTART));
-        autostartSwitch.setOnCheckedChangeListener((btn, checked) ->
-                prefs.edit().putBoolean(UploadSettings.KEY_AUTOSTART, checked).apply());
-
-        // If the user wants the service running, kick it on every activity launch.
+        // The service is always-on: it tracks consumption and syncs to MongoDB cloud.
         // startForegroundService is idempotent — if the service is already up this
-        // is a no-op aside from delivering a new intent. We don't trust
-        // service_running as a sole indicator because it can be stale-true if a
-        // previous process was force-killed (e.g. by `adb install -r`) without
-        // onDestroy running.
-        boolean enabled = prefs.getBoolean("service_enabled", false);
-        boolean haveCreds = !securePrefs.getString(SecurePrefs.KEY_TOKEN, "").trim().isEmpty()
-                         && !securePrefs.getString(SecurePrefs.KEY_API_KEY, "").trim().isEmpty();
-        boolean uploadEnabled = prefs.getBoolean(UploadSettings.KEY_ABRP_UPLOAD_ENABLED,
-                UploadSettings.DEFAULT_ABRP_UPLOAD_ENABLED);
-        if (enabled && (!uploadEnabled || haveCreds)) {
-            // Asked for first, and deliberately: the service declares the `location`
-            // foreground type, and since API 34 starting it without the permission behind
-            // that type is a SecurityException in its own onCreate. Started this way round,
-            // the very first launch after an install could never bring the uploader up.
-            requestLocationPermissionIfNeeded();
-            startForegroundService(new Intent(this, AbrpUploadService.class));
-        }
-
-        abrpPane.findViewById(R.id.save_button).setOnClickListener(v -> saveCredentials());
-        testButton.setOnClickListener(v -> testConnection());
-        abrpPane.findViewById(R.id.import_button).setOnClickListener(v -> startConfigImport());
-        wireProbeIfDebug();
-
-        serviceSwitch.setOnCheckedChangeListener((btn, checked) -> {
-            if (checked) {
-                String apiKey = textOf(apiKeyInput);
-                String token  = textOf(tokenInput);
-                if (abrpUploadSwitch.isChecked() && (apiKey.isEmpty() || token.isEmpty())) {
-                    serviceSwitch.setChecked(false);
-                    if (apiKey.isEmpty()) apiKeyLayout.setError(getString(R.string.api_key_required));
-                    if (token.isEmpty())  tokenLayout.setError(getString(R.string.token_required));
-                    return;
-                }
-                apiKeyLayout.setError(null);
-                tokenLayout.setError(null);
-                prefs.edit().putBoolean("service_enabled", true).apply();
-                startForegroundService(new Intent(this, AbrpUploadService.class));
-                requestLocationPermissionIfNeeded();
-            } else {
-                prefs.edit().putBoolean("service_enabled", false).apply();
-                stopService(new Intent(this, AbrpUploadService.class));
-            }
-            refreshStatus();
-        });
-
-        abrpUploadSwitch.setOnCheckedChangeListener((btn, checked) -> {
-            if (checked) {
-                String apiKey = textOf(apiKeyInput);
-                String token = textOf(tokenInput);
-                if (apiKey.isEmpty() || token.isEmpty()) {
-                    abrpUploadSwitch.setChecked(false);
-                    if (apiKey.isEmpty()) apiKeyLayout.setError(getString(R.string.api_key_required));
-                    if (token.isEmpty()) tokenLayout.setError(getString(R.string.token_required));
-                    return;
-                }
-            }
-            prefs.edit().putBoolean(UploadSettings.KEY_ABRP_UPLOAD_ENABLED, checked).apply();
-            AbrpUploadService.reloadSettings();
-            refreshStatus();
-        });
+        // is a no-op aside from delivering a new intent.
+        startForegroundService(new Intent(this, AbrpUploadService.class));
     }
 
     private void showAbout() {
@@ -386,248 +262,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        apiKeyInput.setText(savedApiKeyOrDefault());
-        tokenInput.setText(securePrefs.getString(SecurePrefs.KEY_TOKEN, ""));
-        serviceSwitch.setChecked(prefs.getBoolean("service_enabled", false));
-        abrpUploadSwitch.setChecked(prefs.getBoolean(
-                UploadSettings.KEY_ABRP_UPLOAD_ENABLED,
-                UploadSettings.DEFAULT_ABRP_UPLOAD_ENABLED));
-        autostartSwitch.setChecked(
-                prefs.getBoolean(UploadSettings.KEY_AUTOSTART, UploadSettings.DEFAULT_AUTOSTART));
         // Poll state and log only while the screen is up; onPause cancels it.
         uiHandler.post(uiRefresh);
-    }
-
-    // ---------- Credentials ----------
-
-    /**
-     * The SAIC open-source gateway publishes this shared ABRP key for compatible clients.
-     * A user-supplied key saved in encrypted preferences always takes precedence.
-     */
-    private String savedApiKeyOrDefault() {
-        String savedApiKey = securePrefs.getString(SecurePrefs.KEY_API_KEY, "");
-        return savedApiKey == null || savedApiKey.trim().isEmpty()
-                ? getString(R.string.default_abrp_api_key)
-                : savedApiKey;
-    }
-
-    private void saveCredentials() {
-        String apiKey = textOf(apiKeyInput);
-        String token  = textOf(tokenInput);
-        boolean valid = true;
-
-        if (apiKey.isEmpty()) {
-            apiKeyLayout.setError(getString(R.string.api_key_required));
-            valid = false;
-        } else {
-            apiKeyLayout.setError(null);
-        }
-        if (token.isEmpty()) {
-            tokenLayout.setError(getString(R.string.token_required));
-            valid = false;
-        } else {
-            tokenLayout.setError(null);
-        }
-        if (!valid) return;
-
-        securePrefs.edit()
-                .putString(SecurePrefs.KEY_API_KEY, apiKey)
-                .putString(SecurePrefs.KEY_TOKEN,   token)
-                .apply();
-
-        if (serviceSwitch.isChecked()) {
-            startForegroundService(new Intent(this, AbrpUploadService.class));
-        }
-        refreshStatus();
-    }
-
-    // ---------- Config import ----------
-
-    /**
-     * The MG4 head unit ships no document picker — SAF answers "FileManagement is no supported
-     * on this device" — so the file is found by scanning instead. getExternalFilesDirs() returns
-     * this app's own folder on internal storage and on every mounted volume including a USB
-     * stick, and those need no storage permission at any API level. The picker stays as the
-     * fallback for phones and tablets, where the user may keep the file anywhere.
-     */
-    private void startConfigImport() {
-        java.io.File found = findConfigFile();
-        if (found != null) {
-            importConfig(found);
-            return;
-        }
-        try {
-            // Any MIME: the MG4 Files app tags .txt inconsistently, so filtering by type hides
-            // the very file the user is trying to pick. They select it by name instead.
-            configPicker.launch(new String[]{"*/*"});
-        } catch (android.content.ActivityNotFoundException e) {
-            setConnectionStatus(COLOR_ERROR, getString(R.string.import_err_not_found, configDirHint()));
-        }
-    }
-
-    /**
-     * First readable file in an app-specific folder that parses as a config. Names are not
-     * filtered: the user copies one file to the folder, whatever they called it.
-     */
-    private java.io.File findConfigFile() {
-        for (java.io.File dir : getExternalFilesDirs(null)) {
-            if (dir == null) continue;
-            java.io.File[] files = dir.listFiles();
-            if (files == null) continue;
-            for (java.io.File f : files) {
-                if (f.isFile() && f.canRead() && f.length() > 0 && f.length() <= 64 * 1024
-                        && !ConfigImport.parse(readText(f)).isEmpty()) {
-                    return f;
-                }
-            }
-        }
-        return null;
-    }
-
-    /** File text, or "" when unreadable — callers treat that as "not a config". */
-    private String readText(java.io.File file) {
-        try (java.io.InputStream in = new java.io.FileInputStream(file)) {
-            return readCapped(in);
-        } catch (Exception e) {
-            return "";
-        }
-    }
-
-    /**
-     * Cap the read so a wrong file (a huge binary picked by mistake) can't be slurped whole
-     * into memory before we find out it isn't a config.
-     */
-    private String readCapped(java.io.InputStream in) throws java.io.IOException {
-        java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
-        byte[] chunk = new byte[4096];
-        int n;
-        while ((n = in.read(chunk)) != -1 && buf.size() < 64 * 1024) buf.write(chunk, 0, n);
-        return buf.toString(java.nio.charset.StandardCharsets.UTF_8.name());
-    }
-
-    /** Where the user should drop the file, shown when nothing was found. */
-    private String configDirHint() {
-        java.io.File[] dirs = getExternalFilesDirs(null);
-        return dirs.length > 0 && dirs[0] != null ? dirs[0].getAbsolutePath() : "";
-    }
-
-    private void importConfig(java.io.File file) {
-        String text = readText(file);
-        if (text.isEmpty()) {
-            setConnectionStatus(COLOR_ERROR, getString(R.string.import_err_read));
-            return;
-        }
-        applyConfig(text);
-    }
-
-    private void importConfig(android.net.Uri uri) {
-        String text;
-        try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
-            if (in == null) throw new java.io.IOException("no stream");
-            text = readCapped(in);
-        } catch (Exception e) {
-            setConnectionStatus(COLOR_ERROR, getString(R.string.import_err_read));
-            return;
-        }
-        applyConfig(text);
-    }
-
-    /**
-     * Applies whatever the config text sets. Credentials go straight to the encrypted store;
-     * cadence keys go to the plain prefs the same way the manual controls write them. Absent
-     * keys are left untouched, so a file carrying only the credentials does not wipe a cadence
-     * the user already tuned.
-     */
-    private void applyConfig(String text) {
-        ConfigImport config = ConfigImport.parse(text);
-        if (config.isEmpty()) {
-            setConnectionStatus(COLOR_ERROR, getString(R.string.import_err_empty));
-            return;
-        }
-
-        if (config.apiKey != null) {
-            securePrefs.edit().putString(SecurePrefs.KEY_API_KEY, config.apiKey).apply();
-        }
-        if (config.token != null) {
-            securePrefs.edit().putString(SecurePrefs.KEY_TOKEN, config.token).apply();
-        }
-        SharedPreferences.Editor edit = prefs.edit();
-        if (config.intervalSec != null) {
-            edit.putInt(UploadSettings.KEY_INTERVAL_SEC, config.intervalSec);
-        }
-        if (config.boostLowSoc != null) {
-            edit.putBoolean(UploadSettings.KEY_BOOST_LOW_SOC, config.boostLowSoc);
-        }
-        if (config.lowSocPercent != null) {
-            edit.putInt(UploadSettings.KEY_LOW_SOC_PERCENT, config.lowSocPercent);
-        }
-        edit.apply();
-
-        // Re-read every control from prefs so the screen shows what was imported.
-        apiKeyInput.setText(savedApiKeyOrDefault());
-        tokenInput.setText(securePrefs.getString(SecurePrefs.KEY_TOKEN, ""));
-        apiKeyLayout.setError(null);
-        tokenLayout.setError(null);
-        bindCadenceControls();
-        AbrpUploadService.reloadSettings();
-
-        if (serviceSwitch.isChecked()) {
-            startForegroundService(new Intent(this, AbrpUploadService.class));
-        }
-        setConnectionStatus(COLOR_OK, getString(R.string.import_ok));
-        refreshStatus();
-    }
-
-    // ---------- Connection test ----------
-
-    private void testConnection() {
-        String apiKey = textOf(apiKeyInput);
-        String token  = textOf(tokenInput);
-
-        if (apiKey.isEmpty() || token.isEmpty()) {
-            if (apiKey.isEmpty()) apiKeyLayout.setError(getString(R.string.api_key_required));
-            if (token.isEmpty())  tokenLayout.setError(getString(R.string.token_required));
-            return;
-        }
-
-        setConnectionStatus(COLOR_PENDING, getString(R.string.conn_testing));
-        testButton.setEnabled(false);
-
-        new Thread(() -> {
-            String result = pingAbrp(apiKey, token);
-            runOnUiThread(() -> {
-                testButton.setEnabled(true);
-                if (result == null) {
-                    setConnectionStatus(COLOR_OK, getString(R.string.conn_ok));
-                } else {
-                    setConnectionStatus(COLOR_ERROR, result);
-                }
-            });
-        }).start();
-    }
-
-    /**
-     * Sends a minimal test request to the ABRP API.
-     * Returns null on success, or a short error string on failure.
-     */
-    private String pingAbrp(String apiKey, String token) {
-        try {
-            // Read-only check. The previous version POSTed {"utc":...,"soc":0} to the LIVE
-            // /tlm/send endpoint, i.e. told ABRP the car was at 0% every time the user
-            // pressed Test, wrecking the route plan it had computed.
-            AbrpApi.Response response = AbrpApi.verifyCredentials(apiKey, token);
-
-            if (response.code == 200) return null;
-            if (response.code == 401) return getString(R.string.conn_err_auth);
-            return getString(R.string.conn_err_http, response.code);
-
-        } catch (java.net.UnknownHostException e) {
-            return getString(R.string.conn_err_no_internet);
-        } catch (java.net.SocketTimeoutException e) {
-            return getString(R.string.conn_err_timeout);
-        } catch (Exception e) {
-            return e.getMessage();
-        }
     }
 
     @Override
@@ -635,67 +271,6 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
         // Stop polling off-screen: this activity has no reason to spend cycles then.
         uiHandler.removeCallbacks(uiRefresh);
-    }
-
-    // ---------- Cadence configuration ----------
-
-    private void bindCadenceControls() {
-        UploadSettings current = UploadSettings.from(prefs);
-
-        String[] labels = new String[UploadSettings.INTERVAL_CHOICES_SEC.length];
-        int selected = 0;
-        for (int i = 0; i < UploadSettings.INTERVAL_CHOICES_SEC.length; i++) {
-            int sec = UploadSettings.INTERVAL_CHOICES_SEC[i];
-            labels[i] = sec >= 60
-                    ? getResources().getQuantityString(R.plurals.interval_minutes, sec / 60, sec / 60)
-                    : getResources().getQuantityString(R.plurals.interval_seconds, sec, sec);
-            if (sec == current.intervalSec) selected = i;
-        }
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                this, R.layout.spinner_value, labels);
-        adapter.setDropDownViewResource(R.layout.spinner_dropdown);
-        intervalSpinner.setAdapter(adapter);
-        intervalSpinner.setSelection(selected);
-        intervalSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                prefs.edit().putInt(UploadSettings.KEY_INTERVAL_SEC,
-                        UploadSettings.INTERVAL_CHOICES_SEC[position]).apply();
-                // Takes effect on the next cycle — no service restart needed.
-                AbrpUploadService.reloadSettings();
-            }
-            @Override public void onNothingSelected(AdapterView<?> parent) { }
-        });
-
-        boostSwitch.setChecked(current.boostLowSoc);
-        lowSocLayout.setEnabled(current.boostLowSoc);
-        lowSocInput.setEnabled(current.boostLowSoc);
-        boostSwitch.setOnCheckedChangeListener((button, checked) -> {
-            prefs.edit().putBoolean(UploadSettings.KEY_BOOST_LOW_SOC, checked).apply();
-            lowSocLayout.setEnabled(checked);
-            lowSocInput.setEnabled(checked);
-            AbrpUploadService.reloadSettings();
-        });
-
-        lowSocInput.setText(String.valueOf(current.lowSocPercent));
-        lowSocInput.setOnFocusChangeListener((view, hasFocus) -> {
-            if (!hasFocus) saveLowSocThreshold();
-        });
-    }
-
-    /** Clamped to 1-99: 0 would never trigger and 100 would boost permanently. */
-    private void saveLowSocThreshold() {
-        CharSequence raw = lowSocInput.getText();
-        int value;
-        try {
-            value = Integer.parseInt(raw == null ? "" : raw.toString().trim());
-        } catch (NumberFormatException e) {
-            value = UploadSettings.DEFAULT_LOW_SOC_PERCENT;
-        }
-        value = Math.max(1, Math.min(99, value));
-        lowSocInput.setText(String.valueOf(value));
-        prefs.edit().putInt(UploadSettings.KEY_LOW_SOC_PERCENT, value).apply();
-        AbrpUploadService.reloadSettings();
     }
 
     // ---------- Update check ----------
@@ -854,6 +429,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void bindConsumptionPane() {
         consumptionTracker = ConsumptionTracker.get(this);
+        consumptionCloudClient = new ConsumptionCloudClient(getApplicationContext());
         consumptionDistance = consumptionPane.findViewById(R.id.consumption_distance);
         consumptionEnergy = consumptionPane.findViewById(R.id.consumption_energy);
         consumptionAverage = consumptionPane.findViewById(R.id.consumption_average);
@@ -992,7 +568,15 @@ public class MainActivity extends AppCompatActivity {
 
     private void refreshConsumption() {
         if (consumptionTracker == null) return;
-        ConsumptionTracker.Totals t = consumptionTracker.totals(consumptionPeriod);
+        // Trip counters are local-only (cloud has no trip concept); everything else reads
+        // back from the cloud so an APK wipe does not blank the display.
+        ConsumptionTracker.Totals t;
+        if (consumptionPeriod == ConsumptionTracker.Period.TRIP_A
+                || consumptionPeriod == ConsumptionTracker.Period.TRIP_B) {
+            t = consumptionTracker.totals(consumptionPeriod);
+        } else {
+            t = cloudTotals(consumptionPeriod);
+        }
         consumptionDistance.setText(String.format(java.util.Locale.getDefault(), "%.1f km", t.km));
         consumptionEnergy.setText(String.format(java.util.Locale.getDefault(), "%.2f kWh", t.kwh));
         consumptionAverage.setText(t.km < 0.1 ? "—" : String.format(java.util.Locale.getDefault(),
@@ -1003,7 +587,9 @@ public class MainActivity extends AppCompatActivity {
         consumptionTime.setText(String.format(java.util.Locale.getDefault(), "%d sa %02d dk",
                 minutes / 60, minutes % 60));
         consumptionSoc.setText(String.format(java.util.Locale.getDefault(), "%.1f %%", t.soc));
-        ConsumptionTracker.Totals day = consumptionTracker.totalsForDay(selectedConsumptionDate);
+        // Daily history: cloud first, local fallback for today (not yet uploaded).
+        ConsumptionTracker.Totals day = cloudDay(selectedConsumptionDate);
+        if (day == null) day = consumptionTracker.totalsForDay(selectedConsumptionDate);
         if (day.km == 0 && day.kwh == 0 && day.hours == 0 && day.soc == 0) {
             consumptionDailyHistory.setText("Bu tarih için kayıt yok");
         } else {
@@ -1014,6 +600,43 @@ public class MainActivity extends AppCompatActivity {
                     "Mesafe       %.1f km\nEnerji       %.2f kWh\nOrtalama     %s\nSüre         %d sa %02d dk\nSOC farkı    %.1f %%",
                     day.km, day.kwh, average, dayMinutes / 60, dayMinutes % 60, day.soc));
         }
+    }
+
+    /**
+     * Period totals from the cloud history. LIFETIME = the latest record's lifetime field;
+     * WEEK/MONTH = sum of the last 7/30 days' day-totals. Falls back to the local tracker
+     * when the cloud is empty or not yet fetched, so the UI is never blank on a cold start.
+     */
+    private ConsumptionTracker.Totals cloudTotals(ConsumptionTracker.Period period) {
+        List<ConsumptionCloudClient.DayRecord> history = consumptionCloudClient != null
+                ? consumptionCloudClient.fetchHistoryIfDue() : java.util.Collections.emptyList();
+        if (history.isEmpty()) return consumptionTracker.totals(period);
+        if (period == ConsumptionTracker.Period.LIFETIME) {
+            // history is sorted date-desc, so index 0 is the latest day carrying lifetime.
+            return history.get(0).lifetime;
+        }
+        int days = period == ConsumptionTracker.Period.WEEK ? 7 : 30;
+        double km = 0, kwh = 0, hours = 0, soc = 0;
+        LocalDate today = LocalDate.now();
+        for (int i = 0; i < days; i++) {
+            ConsumptionTracker.Totals d = cloudDay(today.minusDays(i), history);
+            if (d != null) { km += d.km; kwh += d.kwh; hours += d.hours; soc += d.soc; }
+        }
+        return new ConsumptionTracker.Totals(km, kwh, hours, soc);
+    }
+
+    /** Looks up one day in the cloud cache; null when that date is not present. */
+    private ConsumptionTracker.Totals cloudDay(LocalDate date) {
+        return cloudDay(date, consumptionCloudClient != null
+                ? consumptionCloudClient.fetchHistoryIfDue() : java.util.Collections.emptyList());
+    }
+
+    private static ConsumptionTracker.Totals cloudDay(LocalDate date,
+            List<ConsumptionCloudClient.DayRecord> history) {
+        for (ConsumptionCloudClient.DayRecord r : history) {
+            if (r.date.equals(date)) return r.day;
+        }
+        return null;
     }
 
     private void showConsumptionDatePicker() {
@@ -1091,86 +714,22 @@ public class MainActivity extends AppCompatActivity {
         callLogText.setText(sb.toString());
     }
 
-    // ---------- VHAL probe ----------
-
-    /**
-     * Wires the "VHAL Probe" button that dumps the vehicle's own telemetry property
-     * surface into the in-app log. The head unit runs no adb, so the screen's existing
-     * log view is the only channel a diagnostic can reach the driver through.
-     *
-     * Present in every build, not just debug: identifying the SWI69 property ids needs to
-     * happen on a production APK on the car, and EVHardware's probe is read-only, so it is
-     * safe to ship. It deliberately holds no device credentials. Keep it until the
-     * per-generation property map for SWI69 is confirmed, then gate it on debug.
-     */
-    private void wireProbeIfDebug() {
-        View probeButton = abrpPane.findViewById(R.id.probe_button);
-        if (probeButton == null) return;
-        probeButton.setVisibility(View.VISIBLE);
-        probeButton.setOnClickListener(v -> runProbe());
-    }
-
-    private void runProbe() {
-        // Binder reads are slow enough to be worth keeping off the UI thread; the result
-        // is recorded through the upload log, which the screen already renders.
-        new Thread(() -> {
-            try {
-                EVHardware.INSTANCE.init(getApplicationContext());
-                java.util.List<EVHardware.PropertyReport> reports = EVHardware.INSTANCE.probeTelemetryProperties();
-                String firmware = String.valueOf(FirmwareInfo.INSTANCE.getGeneration());
-                StringBuilder sb = new StringBuilder("VHAL probe on ").append(firmware).append('\n');
-                for (EVHardware.PropertyReport r : reports) sb.append("  ").append(r).append('\n');
-                sb.append("TOTAL ").append(reports.size()).append(" properties probed");
-                runOnUiThread(() -> AbrpUploadService.log().record(
-                        new UploadLog.Entry(System.currentTimeMillis(), 200, true, "VHAL Probe", sb.toString())));
-            } catch (Throwable t) {
-                String msg = "Probe failed: " + (t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName());
-                runOnUiThread(() -> AbrpUploadService.log().record(
-                        new UploadLog.Entry(System.currentTimeMillis(), 0, false, "VHAL Probe", msg)));
-            }
-        }).start();
-    }
-
-    private void setConnectionStatus(int color, String message) {
-        connectionStatusRow.setVisibility(View.VISIBLE);
-        connectionIndicator.getBackground().setTint(color);
-        connectionStatusText.setText(message);
-        connectionStatusText.setTextColor(color);
-    }
-
     // ---------- Service status ----------
 
     private void refreshStatus() {
-        // Live signal, not the preference: "service_running" stays stale-true after a
-        // force-kill because onDestroy never ran.
+        // The service is always running. Show the cloud sync state derived from the log.
         UploadLog.State state = AbrpUploadService.state();
-
-        if (AbrpUploadService.isRunning() && !prefs.getBoolean(
-                UploadSettings.KEY_ABRP_UPLOAD_ENABLED,
-                UploadSettings.DEFAULT_ABRP_UPLOAD_ENABLED)) {
-            statusText.setText(R.string.state_tracking_locally);
-            statusText.setTextColor(COLOR_OK);
-            return;
-        }
 
         switch (state) {
             case ERROR:
-                // Derived from the log, not from the last status alone: a single failed
-                // upload is normal (tunnel, dead spot), three in a row is a problem.
+                // Derived from the log: three consecutive cloud sync failures is a problem.
                 statusText.setText(getString(R.string.state_error,
                         AbrpUploadService.log().consecutiveFailures()));
                 statusText.setTextColor(COLOR_ERROR);
                 break;
             case RUNNING:
-                String lastTime = prefs.getString("last_upload_time", null);
-                statusText.setText(lastTime != null
-                        ? getString(R.string.status_last_upload, lastTime,
-                                getString(R.string.status_ok))
-                        : getString(R.string.state_running));
-                statusText.setTextColor(COLOR_OK);
-                break;
             case STARTING:
-                statusText.setText(R.string.state_starting);
+                statusText.setText("Tüketim takibi aktif");
                 statusText.setTextColor(COLOR_OK);
                 break;
             case STOPPED:
@@ -1186,91 +745,5 @@ public class MainActivity extends AppCompatActivity {
     private String textOf(TextInputEditText field) {
         CharSequence text = field.getText();
         return text != null ? text.toString().trim() : "";
-    }
-
-    /**
-     * Permissions that need a runtime grant (vs being granted at install time
-     * via the platform signature). CAR_SPEED and CAR_ENERGY are dangerous-level
-     * AAOS permissions — without these, the corresponding property reads throw
-     * SecurityException and we have no SOC / speed data.
-     */
-    private static final String[] RUNTIME_PERMISSIONS = {
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            "android.car.permission.CAR_SPEED",
-            "android.car.permission.CAR_ENERGY",
-            "android.car.permission.CAR_ENERGY_PORTS",
-            // Outside temperature and cabin temperature: declared and read since 2.1.0, but
-            // never asked for, so both came back unreadable and were dropped from every
-            // payload on a car that would have answered them.
-            "android.car.permission.CAR_EXTERIOR_ENVIRONMENT",
-            "android.car.permission.CONTROL_CAR_CLIMATE",
-    };
-
-    /**
-     * Asked for alongside the telemetry permissions from API 33, and separately because a
-     * denial costs something different: the foreground notification is the only status this
-     * service has, and without this it is dropped silently while the service runs on.
-     */
-    private static String[] runtimePermissions() {
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
-            return RUNTIME_PERMISSIONS;
-        }
-        String[] all = java.util.Arrays.copyOf(RUNTIME_PERMISSIONS, RUNTIME_PERMISSIONS.length + 1);
-        all[RUNTIME_PERMISSIONS.length] = Manifest.permission.POST_NOTIFICATIONS;
-        return all;
-    }
-
-    private void requestLocationPermissionIfNeeded() {
-        java.util.List<String> missing = new java.util.ArrayList<>();
-        for (String p : runtimePermissions()) {
-            if (ContextCompat.checkSelfPermission(this, p)
-                    != PackageManager.PERMISSION_GRANTED) {
-                missing.add(p);
-            }
-        }
-        if (!missing.isEmpty()) {
-            ActivityCompat.requestPermissions(this,
-                    missing.toArray(new String[0]),
-                    LOCATION_PERMISSION_REQUEST);
-        }
-    }
-
-    /**
-     * A denied permission used to be silent: the service kept running and simply uploaded
-     * nothing useful, with the UI claiming everything was fine. Say what was denied and
-     * what it costs.
-     */
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode != LOCATION_PERMISSION_REQUEST) return;
-
-        boolean locationDenied = false;
-        boolean carDataDenied  = false;
-        for (int i = 0; i < permissions.length && i < grantResults.length; i++) {
-            if (grantResults[i] == PackageManager.PERMISSION_GRANTED) continue;
-            if (Manifest.permission.ACCESS_FINE_LOCATION.equals(permissions[i])) {
-                locationDenied = true;
-            } else {
-                carDataDenied = true;
-            }
-        }
-
-        // A grant that arrives after the service is already up changes which foreground
-        // types it may hold, and which properties it may read. Starting it again is what
-        // applies both without waiting for the next boot.
-        if (prefs.getBoolean("service_enabled", false)) {
-            startForegroundService(new Intent(this, AbrpUploadService.class));
-        }
-
-        if (locationDenied && carDataDenied) {
-            setConnectionStatus(COLOR_ERROR, getString(R.string.perm_denied_all));
-        } else if (locationDenied) {
-            setConnectionStatus(COLOR_ERROR, getString(R.string.perm_denied_location));
-        } else if (carDataDenied) {
-            setConnectionStatus(COLOR_ERROR, getString(R.string.perm_denied_car));
-        }
-        refreshStatus();
     }
 }

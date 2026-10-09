@@ -4,27 +4,37 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 
-/** Best-effort MongoDB sync through the web API. Never blocks local persistence. */
+/**
+ * Best-effort MongoDB sync through the web API. Never blocks local persistence.
+ *
+ * The installationId is a fixed value baked into BuildConfig — never a random UUID — so an
+ * APK wipe cannot orphan the cloud history under a new identity. The consumption UI reads
+ * back its own uploaded totals via {@link #fetchHistoryIfDue}, which means an APK reinstall
+ * picks up right where the old one left off instead of showing zeroes.
+ */
 final class ConsumptionCloudClient {
     private static final String TAG = "FatihsMG4.Mongo";
     private static final long CONSUMPTION_SYNC_INTERVAL_MS = 30 * 60_000L;
     private static final long CHARGE_RETRY_INTERVAL_MS = 5 * 60_000L;
+    private static final long HISTORY_FETCH_INTERVAL_MS = 5 * 60_000L;
     private static final int TIMEOUT_MS = 8_000;
     private static final String PREFS = "consumption_cloud";
-    private static final String INSTALLATION_ID = "installation_id";
-    private static final String LAST_CONSUMPTION_DATE = "last_consumption_date";
-    private static final int MAX_DAYS_PER_SYNC = 10;
+    private static final String CHUNK_CACHE = "chunk_cache";   // JSON array of pending chunks
     private static final int MAX_CHARGES_PER_SYNC = 10;
 
     private final String endpoint;
@@ -35,57 +45,156 @@ final class ConsumptionCloudClient {
     private long lastChargeAttemptMs;
     private String lastAttemptedChargeId = "";
 
+    /** Cached history read back from the cloud, refreshed on a 5-minute throttle. */
+    private volatile List<DayRecord> cachedHistory = Collections.emptyList();
+    private volatile long lastHistoryFetchMs;
+
+    /** One day's uploaded totals, as read back from the cloud. */
+    static final class DayRecord {
+        final LocalDate date;
+        final ConsumptionTracker.Totals day;
+        final ConsumptionTracker.Totals lifetime;
+        final Float sohPercent;
+
+        DayRecord(LocalDate date, ConsumptionTracker.Totals day, ConsumptionTracker.Totals lifetime, Float sohPercent) {
+            this.date = date;
+            this.day = day;
+            this.lifetime = lifetime;
+            this.sohPercent = sohPercent;
+        }
+    }
+
     ConsumptionCloudClient(Context context) {
         endpoint = BuildConfig.CONSUMPTION_API_URL.trim();
         token = BuildConfig.CONSUMPTION_API_TOKEN.trim();
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        String existing = prefs.getString(INSTALLATION_ID, "");
-        if (existing == null || existing.isEmpty()) {
-            existing = UUID.randomUUID().toString();
-            prefs.edit().putString(INSTALLATION_ID, existing).commit();
+        installationId = BuildConfig.CONSUMPTION_INSTALLATION_ID.trim();
+        if (endpoint.isEmpty() || token.isEmpty()) {
+            Log.w(TAG, "Consumption API not configured: endpoint=" + (endpoint.isEmpty() ? "empty" : "ok")
+                    + ", token=" + (token.isEmpty() ? "empty" : "ok"));
         }
-        installationId = existing;
     }
 
     /**
+     * Every 30 minutes, takes a delta chunk from the tracker and sends it. Chunks that fail
+     * to send (offline, server error) accumulate in a local cache and are retried on the
+     * next cycle — so a drive through a dead-signal area still reaches the cloud once the
+     * head unit is back on the hotspot. Every attempt is logged to the in-app "Kayıtlar" tab.
+     *
      * @param nowMs wall clock, recorded with the payload — the throttle below runs on a
      *              monotonic clock instead, so a backwards NTP correction cannot stall
      *              syncing for however long the jump was.
      */
     void syncIfDue(ConsumptionTracker tracker, ChargeSessionTracker charges, long nowMs) {
         long elapsed = android.os.SystemClock.elapsedRealtime();
-        if (endpoint.isEmpty() || token.isEmpty()) return;
+        if (endpoint.isEmpty() || token.isEmpty()) {
+            Log.d(TAG, "Sync skipped: API not configured");
+            return;
+        }
         syncPendingChargesIfDue(charges, elapsed);
-        if (lastConsumptionAttemptMs != 0L
-                && elapsed - lastConsumptionAttemptMs < CONSUMPTION_SYNC_INTERVAL_MS) return;
+
+        // Drain any cached chunks first — a backlog from an offline period has priority.
+        int cached = drainChunkCache();
+        if (cached > 0) {
+            logEvent(true, 200, "Cache boşaltıldı: " + cached + " chunk gönderildi");
+            invalidateHistory();
+        }
+
+        boolean due = lastConsumptionAttemptMs == 0L
+                || elapsed - lastConsumptionAttemptMs >= CONSUMPTION_SYNC_INTERVAL_MS;
+        if (!due) return;
         lastConsumptionAttemptMs = elapsed;
+
+        ConsumptionTracker.CloudSnapshot chunk = tracker.takeChunkDelta();
+        if (chunk == null) {
+            Log.d(TAG, "Sync due but no new consumption since last chunk");
+            return;  // no driving since the last chunk
+        }
+        Log.d(TAG, "New chunk for " + chunk.date + ": +" + String.format("%.1f", chunk.day.km)
+                + "km, +" + String.format("%.2f", chunk.day.kwh) + "kWh");
         try {
-            syncDailyConsumption(tracker, nowMs);
+            JSONObject body = consumptionBody(chunk, nowMs);
+            if (send("/v1/consumption/daily", "PUT", body)) {
+                logEvent(true, 200, "Chunk " + chunk.date + " gönderildi (+"
+                        + String.format("%.1f", chunk.day.km) + "km, +"
+                        + String.format("%.2f", chunk.day.kwh) + "kWh)");
+                invalidateHistory();
+            } else {
+                cacheChunk(body);
+                int pending = pendingChunkCount();
+                logEvent(false, 0, "Chunk gönderilemedi — cache'de bekliyor (" + pending + " chunk)");
+            }
         } catch (Exception e) {
-            Log.w(TAG, "Consumption sync unavailable");
+            // Network failure: cache the chunk for the next cycle.
+            try {
+                JSONObject body = consumptionBody(chunk, nowMs);
+                cacheChunk(body);
+            } catch (Exception ignored) { }
+            int pending = pendingChunkCount();
+            logEvent(false, 0, "Çevrimdışı — cache'de bekliyor (" + pending + " chunk): " + e.getMessage());
+            Log.w(TAG, "Chunk sync failed, cached: " + e.getMessage());
         }
     }
 
-    /** Drains the backlog a few days per cycle; one a cycle took an hour per fortnight. */
-    private void syncDailyConsumption(ConsumptionTracker tracker, long nowMs) throws Exception {
-        String saved = prefs.getString(LAST_CONSUMPTION_DATE, "");
-        LocalDate lastUploaded = null;
-        try { if (saved != null && !saved.isEmpty()) lastUploaded = LocalDate.parse(saved); }
-        catch (RuntimeException ignored) { }
-        for (int sent = 0; sent < MAX_DAYS_PER_SYNC; sent++) {
-            LocalDate target = tracker.nextStoredDayAfter(lastUploaded);
-            if (target == null) break;
-            ConsumptionTracker.CloudSnapshot snapshot = tracker.cloudSnapshot(target);
-            JSONObject body = consumptionBody(snapshot, nowMs);
-            if (!send("/v1/consumption/daily", "PUT", body)) return;
-            prefs.edit().putString(LAST_CONSUMPTION_DATE, target.toString()).commit();
-            lastUploaded = target;
+    /**
+     * Sends every cached chunk; removes each one that succeeds. Returns how many were sent.
+     * A chunk that fails stops the drain — the rest stay in order for the next cycle.
+     */
+    private int drainChunkCache() {
+        JSONArray cache = loadChunkCache();
+        if (cache.length() == 0) return 0;
+        JSONArray remaining = new JSONArray();
+        int sent = 0;
+        for (int i = 0; i < cache.length(); i++) {
+            try {
+                JSONObject body = cache.getJSONObject(i);
+                String date = body.optString("date", "?");
+                if (send("/v1/consumption/daily", "PUT", body)) {
+                    sent++;
+                    Log.d(TAG, "Cached chunk for " + date + " sent");
+                } else {
+                    // Server rejected — keep this and everything after it.
+                    for (int j = i; j < cache.length(); j++) remaining.put(cache.get(j));
+                    break;
+                }
+            } catch (Exception e) {
+                // Network error — keep this and everything after it, stop draining.
+                for (int j = i; j < cache.length(); j++) {
+                    try { remaining.put(cache.get(j)); } catch (Exception ignored) { }
+                }
+                Log.w(TAG, "Cache drain stopped: " + e.getMessage());
+                break;
+            }
         }
-        // Today's cumulative counters overwrite the same installation/date document every
-        // 30 minutes. Sending totals rather than increments makes retries idempotent.
-        ConsumptionTracker.CloudSnapshot today = tracker.cloudSnapshot(LocalDate.now());
-        JSONObject current = consumptionBody(today, nowMs);
-        send("/v1/consumption/daily", "PUT", current);
+        saveChunkCache(remaining);
+        return sent;
+    }
+
+    private JSONArray loadChunkCache() {
+        String raw = prefs.getString(CHUNK_CACHE, "");
+        if (raw == null || raw.isEmpty()) return new JSONArray();
+        try { return new JSONArray(raw); } catch (Exception e) { return new JSONArray(); }
+    }
+
+    private void saveChunkCache(JSONArray cache) {
+        prefs.edit().putString(CHUNK_CACHE, cache.toString()).commit();
+    }
+
+    private void cacheChunk(JSONObject body) {
+        JSONArray cache = loadChunkCache();
+        cache.put(body);
+        saveChunkCache(cache);
+    }
+
+    private int pendingChunkCount() {
+        return loadChunkCache().length();
+    }
+
+    /** Records a cloud-sync attempt to the in-app log (the "Kayıtlar" tab). */
+    private void logEvent(boolean success, int httpStatus, String detail) {
+        UploadLog log = AbrpUploadService.log();
+        if (log == null) return;
+        log.record(new UploadLog.Entry(System.currentTimeMillis(), httpStatus, success, detail));
     }
 
     private JSONObject consumptionBody(ConsumptionTracker.CloudSnapshot snapshot, long nowMs)
@@ -112,18 +221,28 @@ final class ConsumptionCloudClient {
         try {
             syncPendingCharges(charges, pending);
         } catch (Exception e) {
-            Log.w(TAG, "Charging-session sync unavailable");
+            logEvent(false, 0, "Şarj session sync hatası: " + e.getMessage());
+            Log.w(TAG, "Charging-session sync unavailable: " + e.getMessage());
         }
     }
 
     private void syncPendingCharges(ChargeSessionTracker charges, List<JSONObject> pending)
             throws Exception {
+        Log.d(TAG, "Found " + pending.size() + " pending charge sessions");
         int sent = 0;
         for (JSONObject session : pending) {
             JSONObject body = new JSONObject(session.toString()).put("installationId", installationId);
             String id = session.getString("sessionId");
-            if (!send("/v1/charging-sessions/" + id, "PUT", body)) return;
-            charges.markUploaded(id);
+            Log.d(TAG, "Uploading charge session: " + id);
+            if (send("/v1/charging-sessions/" + id, "PUT", body)) {
+                charges.markUploaded(id);
+                logEvent(true, 200, "Şarj session gönderildi: " + id);
+                Log.d(TAG, "Successfully uploaded charge session: " + id);
+            } else {
+                logEvent(false, 0, "Şarj session gönderilemedi: " + id);
+                Log.w(TAG, "Failed to upload charge session: " + id);
+                return;
+            }
             if (++sent >= MAX_CHARGES_PER_SYNC) return;
         }
     }
@@ -132,7 +251,9 @@ final class ConsumptionCloudClient {
         HttpURLConnection connection = null;
         try {
             byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
-            connection = (HttpURLConnection) new URL(trimSlash(endpoint) + path).openConnection();
+            String url = trimSlash(endpoint) + path;
+            Log.d(TAG, "Sending " + method + " request to " + url + " (" + bytes.length + " bytes)");
+            connection = (HttpURLConnection) new URL(url).openConnection();
             connection.setRequestMethod(method);
             connection.setConnectTimeout(TIMEOUT_MS);
             connection.setReadTimeout(TIMEOUT_MS);
@@ -142,13 +263,18 @@ final class ConsumptionCloudClient {
             connection.setRequestProperty("Authorization", "Bearer " + token);
             try (OutputStream out = connection.getOutputStream()) { out.write(bytes); }
             int status = connection.getResponseCode();
-            InputStream response = status < 400 ? connection.getInputStream() : connection.getErrorStream();
-            if (response != null) try (InputStream ignored = response) { }
+            Log.d(TAG, "Response: HTTP " + status);
             if (status < 200 || status >= 300) {
-                Log.w(TAG, "Sync rejected with HTTP " + status);
+                String errBody = readErrorBody(connection);
+                Log.w(TAG, "Sync rejected with HTTP " + status + (errBody.isEmpty() ? "" : ": " + errBody));
                 return false;
             }
+            InputStream response = connection.getInputStream();
+            if (response != null) try (InputStream ignored = response) { }
             return true;
+        } catch (Exception e) {
+            Log.w(TAG, "Network error: " + e.getMessage());
+            throw e;
         } finally {
             if (connection != null) connection.disconnect();
         }
@@ -157,6 +283,107 @@ final class ConsumptionCloudClient {
     private static JSONObject totals(ConsumptionTracker.Totals totals) throws Exception {
         return new JSONObject().put("km", totals.km).put("kwh", totals.kwh)
                 .put("hours", totals.hours).put("socDrop", totals.soc);
+    }
+
+    // ---------- Read-back for the consumption UI ----------
+
+    /**
+     * Returns the cached cloud history, fetching a fresh copy at most every 5 minutes.
+     * Called from the UI poll loop (every 2 s), so the throttle is what keeps the head unit
+     * off the network. On a fetch failure the previous cache is kept — a transient outage
+     * must not blank the display.
+     */
+    List<DayRecord> fetchHistoryIfDue() {
+        if (endpoint.isEmpty() || token.isEmpty()) return cachedHistory;
+        long elapsed = android.os.SystemClock.elapsedRealtime();
+        if (lastHistoryFetchMs != 0L && elapsed - lastHistoryFetchMs < HISTORY_FETCH_INTERVAL_MS) {
+            return cachedHistory;
+        }
+        lastHistoryFetchMs = elapsed;
+        try {
+            List<DayRecord> fresh = fetchHistory();
+            if (!fresh.isEmpty()) cachedHistory = fresh;
+            Log.d(TAG, "Fetched " + fresh.size() + " history records from cloud");
+        } catch (Exception e) {
+            String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            Log.w(TAG, "History fetch unavailable: " + msg);
+            logEvent(false, 0, "History fetch hatası: " + msg);
+        }
+        return cachedHistory;
+    }
+
+    /** Forces a refresh on the next {@link #fetchHistoryIfDue} — call after an upload. */
+    void invalidateHistory() {
+        lastHistoryFetchMs = 0L;
+    }
+
+    private List<DayRecord> fetchHistory() throws Exception {
+        HttpURLConnection connection = null;
+        try {
+            String url = trimSlash(endpoint) + "/v1/consumption/history/" + installationId;
+            connection = (HttpURLConnection) new URL(url).openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(TIMEOUT_MS);
+            connection.setReadTimeout(TIMEOUT_MS);
+            connection.setRequestProperty("Authorization", "Bearer " + token);
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) {
+                Log.w(TAG, "History fetch rejected with HTTP " + status);
+                return cachedHistory;
+            }
+            String body = readBody(connection);
+            JSONObject json = new JSONObject(body);
+            JSONArray records = json.optJSONArray("records");
+            if (records == null) return Collections.emptyList();
+            List<DayRecord> result = new ArrayList<>(records.length());
+            for (int i = 0; i < records.length(); i++) {
+                JSONObject r = records.getJSONObject(i);
+                LocalDate date = LocalDate.parse(r.getString("date"));
+                ConsumptionTracker.Totals day = parseTotals(r.getJSONObject("day"));
+                ConsumptionTracker.Totals life = parseTotals(r.getJSONObject("lifetime"));
+                Float soh = r.has("sohPercent") && !r.isNull("sohPercent")
+                        ? (float) r.getDouble("sohPercent") : null;
+                result.add(new DayRecord(date, day, life, soh));
+            }
+            return result;
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+    }
+
+    private static ConsumptionTracker.Totals parseTotals(JSONObject o) {
+        return new ConsumptionTracker.Totals(
+                o.optDouble("km", 0d), o.optDouble("kwh", 0d),
+                o.optDouble("hours", 0d), o.optDouble("socDrop", 0d));
+    }
+
+    private static String readBody(HttpURLConnection connection) throws Exception {
+        InputStream stream = connection.getInputStream();
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = br.readLine()) != null) sb.append(line);
+            return sb.toString();
+        }
+    }
+
+    /** Reads the error response body (truncated) for logging — never throws. */
+    private static String readErrorBody(HttpURLConnection connection) {
+        try {
+            InputStream stream = connection.getErrorStream();
+            if (stream == null) return "";
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = br.readLine()) != null) sb.append(line);
+                String body = sb.toString();
+                return body.length() > 300 ? body.substring(0, 300) + "…" : body;
+            }
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private static String trimSlash(String value) {

@@ -8,9 +8,6 @@
     <!-- Required from API 33 to post the foreground-service notification, which is the
          only status UI the service has. Without it the notification is silently dropped. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- Wi-Fi auto-join. CHANGE_WIFI_STATE covers enabling the radio and asking the
          supplicant to join a network the unit already has saved; ACCESS_WIFI_STATE covers
@@ -34,14 +31,6 @@
     <uses-permission android:name="android.car.permission.CAR_TIRES" />
     <uses-permission android:name="android.car.permission.CAR_INFO" />
 
-    <!-- The head unit's map stack, which owns the weather service the uploader asks for the
-         outside temperature. From API 30 an explicit bind to a package this app does not
-         declare here simply fails, and ext_temp would go back to being unreportable. -->
-    <queries>
-        <package android:name="com.saicmotor.launcher" />
-        <package android:name="com.saicmotor.mapservice" />
-    </queries>
-
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -63,8 +52,7 @@
 
         <service
             android:name=".AbrpUploadService"
-            android:exported="false"
-            android:foregroundServiceType="location" />
+            android:exported="false" />
 
         <!-- The head unit resumes far more often than it cold-boots, and announces the
              resume with QUICKBOOT_POWERON. Listening only for BOOT_COMPLETED is why

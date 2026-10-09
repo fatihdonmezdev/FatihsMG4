@@ -41,6 +41,10 @@ android {
         // authenticated API in server/, which owns the database connection.
         buildConfigField "String", "CONSUMPTION_API_URL", "\"${System.getenv('CONSUMPTION_API_URL') ?: ''}\""
         buildConfigField "String", "CONSUMPTION_API_TOKEN", "\"${System.getenv('CONSUMPTION_API_TOKEN') ?: ''}\""
+        // Fixed installation identity: baked into every build so an APK wipe cannot orphan
+        // the cloud history under a new random UUID. The car's own consumption history lives
+        // under this id in the daily_consumption collection.
+        buildConfigField "String", "CONSUMPTION_INSTALLATION_ID", "\"226b1614-4d18-48f0-8938-3609cfa3db93\""
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
