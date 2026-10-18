@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.40
+
+### Changed
+
+- Replaced estimated 10% charging loss with actual station power telemetry (`PROP_CHR_AMP_EXP`).
+- Station energy is integrated live from station power and pack voltage.
+- Charging costs and grid energy are calculated directly from station energy.
+
 ## 2.2.39
 
 ### Changed
