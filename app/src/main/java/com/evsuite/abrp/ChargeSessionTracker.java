@@ -24,8 +24,6 @@ import java.util.UUID;
  * reading the database needs to place it on a timeline — but nothing is measured from them.
  */
 final class ChargeSessionTracker {
-    static final double CHARGING_LOSS_PERCENT = 10d;
-    static final double GRID_ENERGY_FACTOR = 1d + CHARGING_LOSS_PERCENT / 100d;
     private static final String PREFS = "charging_sessions_v1";
     private static final String ACTIVE = "active";
     private static final String LAST = "last_completed";
@@ -76,16 +74,16 @@ final class ChargeSessionTracker {
 
         Snapshot(boolean charging, long startedAtMs, long durationSeconds,
                  Float startSocPercent, Float currentSocPercent, double energyKwh,
-                 double pricePerKwh, List<Point> points) {
+                 double gridEnergyKwh, double pricePerKwh, List<Point> points) {
             this.charging = charging;
             this.startedAtMs = startedAtMs;
             this.durationSeconds = durationSeconds;
             this.startSocPercent = startSocPercent;
             this.currentSocPercent = currentSocPercent;
             this.energyKwh = energyKwh;
-            this.gridEnergyKwh = gridEnergyKwh(energyKwh);
+            this.gridEnergyKwh = gridEnergyKwh > 0d ? gridEnergyKwh : energyKwh;
             this.pricePerKwh = pricePerKwh;
-            this.totalCost = totalCost(energyKwh, pricePerKwh);
+            this.totalCost = totalCost(this.gridEnergyKwh, pricePerKwh);
             this.points = points;
         }
     }
@@ -103,6 +101,7 @@ final class ChargeSessionTracker {
         long now = snapshot.getTimestampMs();
         long elapsed = SystemClock.elapsedRealtime();
         Float power = snapshot.getBatteryPowerKw();
+        Float stationPower = snapshot.getStationPowerKw();
         Float soc = snapshot.getSocPercent();
         boolean charging = ChargingState.isDcCharging(snapshot.getChargingStatus(),
                 snapshot.getChargePortConnected(), power, snapshot.getSpeedKmh());
@@ -110,7 +109,7 @@ final class ChargeSessionTracker {
         if (charging) {
             endCandidateMs = 0L;
             if (active == null) active = new Session(UUID.randomUUID().toString(), now, soc);
-            active.add(now, elapsed, soc, power);
+            active.add(now, elapsed, soc, power, stationPower);
             persistActive();
             return;
         }
@@ -128,10 +127,10 @@ final class ChargeSessionTracker {
     synchronized Snapshot snapshot() {
         Session session = active != null ? active : Session.fromJson(prefs.getString(LAST, null));
         if (session == null) return new Snapshot(false, 0L, 0L, null, null,
-                0d, pricePerKwh(), new ArrayList<>());
+                0d, 0d, pricePerKwh(), new ArrayList<>());
         double price = active != null ? pricePerKwh() : session.pricePerKwh;
         return new Snapshot(active != null, session.startedAtMs, session.activeSeconds(),
-                session.startSoc, session.lastSoc, session.energyKwh, price,
+                session.startSoc, session.lastSoc, session.energyKwh, session.stationEnergyKwh, price,
                 new ArrayList<>(session.points));
     }
 
@@ -144,12 +143,12 @@ final class ChargeSessionTracker {
         return Double.longBitsToDouble(prefs.getLong(PRICE, 0L));
     }
 
-    static double gridEnergyKwh(double batteryEnergyKwh) {
-        return batteryEnergyKwh * GRID_ENERGY_FACTOR;
+    static double gridEnergyKwh(double stationEnergyKwh) {
+        return stationEnergyKwh;
     }
 
-    static double totalCost(double batteryEnergyKwh, double pricePerKwh) {
-        return gridEnergyKwh(batteryEnergyKwh) * pricePerKwh;
+    static double totalCost(double stationEnergyKwh, double pricePerKwh) {
+        return stationEnergyKwh * pricePerKwh;
     }
 
     synchronized List<JSONObject> pendingUploads() {
@@ -205,7 +204,9 @@ final class ChargeSessionTracker {
         final List<Point> points = new ArrayList<>();
         Float lastSoc;
         Float lastPower;
+        Float lastStationPower;
         double energyKwh;
+        double stationEnergyKwh;
         double meteredSeconds;
         long endedAtMs;
         double pricePerKwh;
@@ -225,7 +226,7 @@ final class ChargeSessionTracker {
             this.lastSoc = startSoc;
         }
 
-        void add(long nowMs, long elapsedMs, Float soc, Float power) {
+        void add(long nowMs, long elapsedMs, Float soc, Float power, Float stationPower) {
             long previous = lastElapsedMs;
             lastElapsedMs = elapsedMs;
             double hours = previous > 0L ? (elapsedMs - previous) / 3_600_000d : 0d;
@@ -234,9 +235,15 @@ final class ChargeSessionTracker {
                 if (power != null && lastPower != null) {
                     energyKwh += Math.max(0d, -(power + lastPower) / 2d) * hours;
                 }
+                if (stationPower != null && lastStationPower != null) {
+                    stationEnergyKwh += Math.max(0d, (stationPower + lastStationPower) / 2d) * hours;
+                } else if (stationPower != null && stationEnergyKwh == 0d) {
+                    stationEnergyKwh += Math.max(0d, stationPower) * hours;
+                }
             }
             if (soc != null) lastSoc = soc;
             if (power != null) lastPower = power;
+            if (stationPower != null) lastStationPower = stationPower;
             if (power != null && -power >= ChargingState.DC_MIN_KW &&
                     (points.isEmpty() || nowMs - points.get(points.size() - 1).timestampMs >= curveIntervalMs)) {
                 points.add(new Point(nowMs, soc, Math.abs(power)));
@@ -274,13 +281,14 @@ final class ChargeSessionTracker {
                     if (point.socPercent != null) p.put("socPercent", point.socPercent);
                     curve.put(p);
                 }
+                double effectiveStationKwh = stationEnergyKwh > 0d ? stationEnergyKwh : energyKwh;
                 JSONObject json = new JSONObject().put("sessionId", id).put("startedAt", startedAtMs)
                         .put("endedAt", endedAtMs).put("durationSeconds", activeSeconds())
                         .put("energyKwh", energyKwh)
-                        .put("chargingLossPercent", CHARGING_LOSS_PERCENT)
-                        .put("gridEnergyKwh", gridEnergyKwh(energyKwh))
+                        .put("stationEnergyKwh", stationEnergyKwh)
+                        .put("gridEnergyKwh", effectiveStationKwh)
                         .put("pricePerKwh", pricePerKwh)
-                        .put("totalCost", totalCost(energyKwh, pricePerKwh))
+                        .put("totalCost", totalCost(effectiveStationKwh, pricePerKwh))
                         .put("curve", curve)
                         .put("meteredSeconds", meteredSeconds)
                         .put("curveIntervalMs", curveIntervalMs);
@@ -302,6 +310,7 @@ final class ChargeSessionTracker {
                 session.lastSoc = json.has("endSocPercent") ? (float) json.getDouble("endSocPercent") : session.startSoc;
                 session.lastPower = json.has("lastPower") ? (float) json.getDouble("lastPower") : null;
                 session.energyKwh = json.optDouble("energyKwh", 0d);
+                session.stationEnergyKwh = json.optDouble("stationEnergyKwh", json.optDouble("gridEnergyKwh", 0d));
                 session.meteredSeconds = json.optDouble("meteredSeconds", json.optLong("durationSeconds", 0L));
                 session.endedAtMs = json.optLong("endedAt", 0L);
                 session.pricePerKwh = json.optDouble("pricePerKwh", 0d);

@@ -408,6 +408,7 @@ object EVHardware {
     private const val PROP_EV_RANGE_KM_SWI68 = 0x2140F41C            // vendor int km
     private const val PROP_BMS_PACK_VOLT_SWI68 = 0x2160F406          // vendor float V
     private const val PROP_BMS_PACK_CURRENT_SWI68 = 0x2160F407       // vendor float A
+    private const val PROP_BMS_PACK_CURRENT_EXP_SWI68 = 0x2160F40A   // vendor float A (station/expected)
     // Vendor publishes one integer per wheel on the global area; the generic per-wheel
     // PROP_TIRE_PRESSURE is declared and never publishes on this vehicle.
     private const val PROP_VENDOR_TIRE_FL = 0x21401553
@@ -597,6 +598,30 @@ object EVHardware {
         if (gen != FirmwareInfo.Gen.SWI68 && gen != FirmwareInfo.Gen.SWI69) return null
         return getFloatPropertyCPM(PROP_BMS_PACK_CURRENT_SWI68, AREA_GLOBAL)
             ?.takeIf { it.isFinite() && kotlin.math.abs(it) <= MAX_PACK_CURRENT_A }
+    }
+
+    /**
+     * Station DC expected current offered to the vehicle (PROP_CHR_AMP_EXP).
+     * Filtered for sanity (valid current range, ignores 0 or 511.5 disconnect markers).
+     */
+    fun getVendorBatteryCurrentExpectedA(): Float? {
+        val gen = FirmwareInfo.getGeneration()
+        if (gen != FirmwareInfo.Gen.SWI68 && gen != FirmwareInfo.Gen.SWI69) return null
+        return getFloatPropertyCPM(PROP_BMS_PACK_CURRENT_EXP_SWI68, AREA_GLOBAL)
+            ?.takeIf { it.isFinite() && kotlin.math.abs(it) <= MAX_PACK_CURRENT_A && kotlin.math.abs(it - 511.5f) > 0.4f }
+    }
+
+    /**
+     * Station DC power offered: battery pack voltage multiplied by station expected current.
+     */
+    fun getVendorStationPowerKw(): Float? {
+        val gen = FirmwareInfo.getGeneration()
+        if (gen != FirmwareInfo.Gen.SWI68 && gen != FirmwareInfo.Gen.SWI69) return null
+        val volts = getFloatPropertyCPM(PROP_BMS_PACK_VOLT_SWI68, AREA_GLOBAL)
+            ?.takeIf { it.isFinite() && it in PACK_VOLTAGE_RANGE } ?: return null
+        val ampsExp = getVendorBatteryCurrentExpectedA() ?: return null
+        val kw = volts * ampsExp / 1_000f
+        return if (kw.isFinite() && kotlin.math.abs(kw) <= 300f) kw else null
     }
 
     /** Vendor range fallback; SWI68 and SWI69 both publish it on the same id. */

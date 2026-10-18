@@ -33,6 +33,8 @@ data class EnergySnapshot(
     val tirePressures: TirePressureSnapshot,
     val batteryVoltageV: Float? = null,
     val batteryCurrentA: Float? = null,
+    val stationCurrentA: Float? = null,
+    val stationPowerKw: Float? = null,
 ) {
     val hasVehicleData: Boolean
         get() = socPercent != null || rangeKm != null || speedKmh != null ||
@@ -40,7 +42,8 @@ data class EnergySnapshot(
             batteryTempCelsius != null || batteryEnergyKwh != null || batteryCapacityKwh != null ||
             odometerKm != null || chargePortConnected != null || chargingStatus != null ||
             vehicleConsumedKwh != null || vehicleRegeneratedKwh != null ||
-            parked != null || climate.hasData || tirePressures.hasData
+            parked != null || climate.hasData || tirePressures.hasData ||
+            stationCurrentA != null || stationPowerKw != null
 }
 
 data class TirePressureSnapshot(
