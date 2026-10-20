@@ -1,27 +1,138 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="24dp">
+
+  <!-- AC / DC Switch Butonları -->
+  <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:layout_marginBottom="16dp">
+      <com.google.android.material.button.MaterialButton
+          android:id="@+id/charge_tab_ac"
+          style="@style/Widget.EV.Button.Outlined"
+          android:layout_width="0dp"
+          android:layout_height="56dp"
+          android:layout_weight="1"
+          android:text="AC Şarj (&lt; 8 kW)" />
+      <com.google.android.material.button.MaterialButton
+          android:id="@+id/charge_tab_dc"
+          style="@style/Widget.EV.Button.Outlined"
+          android:layout_width="0dp"
+          android:layout_height="56dp"
+          android:layout_weight="1"
+          android:layout_marginStart="12dp"
+          android:text="DC Şarj (≥ 8 kW)" />
+  </LinearLayout>
+
+  <!-- 2 Ayrı Bilgi Kutucuğu: Bataryaya giren enerji & Şebekeden alınan enerji -->
+  <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:layout_marginBottom="16dp">
+
+      <!-- 1. Kutucuk: Bataryaya giren enerji -->
+      <LinearLayout
+          android:layout_width="0dp"
+          android:layout_height="wrap_content"
+          android:layout_weight="1"
+          android:orientation="vertical"
+          android:padding="16dp"
+          android:layout_marginEnd="6dp"
+          android:background="@drawable/bg_glass">
+          <TextView
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:text="BATARYAYA GİREN"
+              android:textAppearance="@style/Text.EV.Eyebrow"
+              android:textColor="@color/ev_cyan"
+              android:textSize="12sp" />
+          <TextView
+              android:id="@+id/charge_box_battery_energy"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="6dp"
+              android:text="—"
+              android:textAppearance="@style/Text.EV.Metric"
+              android:textColor="@color/ev_text_primary" />
+          <TextView
+              android:id="@+id/charge_box_battery_sub"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="4dp"
+              android:text="Net batarya enerjisi"
+              android:textAppearance="@style/Text.EV.Secondary"
+              android:textSize="12sp" />
+      </LinearLayout>
+
+      <!-- 2. Kutucuk: Şebekeden alınan enerji (sapmalar dahil) -->
+      <LinearLayout
+          android:layout_width="0dp"
+          android:layout_height="wrap_content"
+          android:layout_weight="1"
+          android:orientation="vertical"
+          android:padding="16dp"
+          android:layout_marginStart="6dp"
+          android:background="@drawable/bg_glass">
+          <TextView
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:text="ŞEBEKEDEN ALINAN"
+              android:textAppearance="@style/Text.EV.Eyebrow"
+              android:textColor="@color/ev_accent"
+              android:textSize="12sp" />
+          <TextView
+              android:id="@+id/charge_box_grid_energy"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="6dp"
+              android:text="—"
+              android:textAppearance="@style/Text.EV.Metric"
+              android:textColor="@color/ev_text_primary" />
+          <TextView
+              android:id="@+id/charge_box_grid_sub"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="4dp"
+              android:text="Sapma / kayıp dahil"
+              android:textAppearance="@style/Text.EV.Secondary"
+              android:textSize="12sp" />
+      </LinearLayout>
+  </LinearLayout>
+
+  <!-- Şarj Durumu ve Detay Parametreleri Tablosu -->
   <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:background="@drawable/bg_glass">
    <TextView android:id="@+id/charge_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Şarj yok" android:textAppearance="@style/Text.EV.Title" android:textColor="@color/ev_cyan"/>
    <GridLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:columnCount="2" android:layout_marginTop="12dp">
-    <TextView android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="SOC" android:textAppearance="@style/DataLabel"/><TextView android:id="@+id/charge_soc" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="—" android:textAppearance="@style/DataValue"/>
+    <TextView android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="Şarj tipi" android:textAppearance="@style/DataLabel"/><TextView android:id="@+id/charge_type" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="—" android:textAppearance="@style/DataValue"/>
+    <TextView android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="Mevcut SOC" android:textAppearance="@style/DataLabel"/><TextView android:id="@+id/charge_soc" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="—" android:textAppearance="@style/DataValue"/>
     <TextView android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="Başlangıç SOC" android:textAppearance="@style/DataLabel"/><TextView android:id="@+id/charge_start_soc" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="—" android:textAppearance="@style/DataValue"/>
     <TextView android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="Batarya voltajı" android:textAppearance="@style/DataLabel"/><TextView android:id="@+id/charge_voltage" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="—" android:textAppearance="@style/DataValue"/>
     <TextView android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="Batarya akımı" android:textAppearance="@style/DataLabel"/><TextView android:id="@+id/charge_current" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="—" android:textAppearance="@style/DataValue"/>
     <TextView android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="Şarj gücü" android:textAppearance="@style/DataLabel"/><TextView android:id="@+id/charge_power" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="—" android:textAppearance="@style/DataValue"/>
-    <TextView android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="Bataryaya giren net enerji" android:textAppearance="@style/DataLabel"/><TextView android:id="@+id/charge_energy" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="—" android:textAppearance="@style/DataValue"/>
-    <TextView android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="İstasyondan alınan enerji" android:textAppearance="@style/DataLabel"/><TextView android:id="@+id/charge_grid_energy" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="—" android:textAppearance="@style/DataValue"/>
+    <TextView android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="Bataryaya giren net" android:textAppearance="@style/DataLabel"/><TextView android:id="@+id/charge_energy" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="—" android:textAppearance="@style/DataValue"/>
+    <TextView android:id="@+id/charge_grid_label" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="Şebekeden alınan" android:textAppearance="@style/DataLabel"/><TextView android:id="@+id/charge_grid_energy" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="—" android:textAppearance="@style/DataValue"/>
     <TextView android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="Şarj süresi" android:textAppearance="@style/DataLabel"/><TextView android:id="@+id/charge_duration" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="—" android:textAppearance="@style/DataValue"/>
+    <TextView android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="Birim fiyat" android:textAppearance="@style/DataLabel"/><TextView android:id="@+id/charge_unit_price" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="—" android:textAppearance="@style/DataValue"/>
     <TextView android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="Toplam ücret" android:textAppearance="@style/DataLabel"/><TextView android:id="@+id/charge_total_cost" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="—" android:textAppearance="@style/DataValue"/>
+    <TextView android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="Konum" android:textAppearance="@style/DataLabel"/><TextView android:id="@+id/charge_location" android:layout_width="0dp" android:layout_columnWeight="1" android:padding="10dp" android:text="—" android:textAppearance="@style/DataValue"/>
    </GridLayout>
   </LinearLayout>
+
+  <!-- Fiyat Girişleri -->
   <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:layout_marginTop="16dp" android:background="@drawable/bg_glass">
-   <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="ŞARJ FİYATI" android:textAppearance="@style/Text.EV.Eyebrow"/>
-   <com.google.android.material.textfield.TextInputLayout android:id="@+id/charge_price_layout" style="@style/Widget.Material3.TextInputLayout.OutlinedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="Birim fiyat" app:suffixText="₺/kWh">
-    <com.google.android.material.textfield.TextInputEditText android:id="@+id/charge_price_input" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" android:maxLength="10" android:minHeight="72dp"/>
+   <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="ŞARJ BİRİM FİYATLARI" android:textAppearance="@style/Text.EV.Eyebrow"/>
+   <com.google.android.material.textfield.TextInputLayout android:id="@+id/charge_price_ac_layout" style="@style/Widget.Material3.TextInputLayout.OutlinedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="AC Birim Fiyat (&lt; 8 kW)" app:suffixText="₺/kWh">
+    <com.google.android.material.textfield.TextInputEditText android:id="@+id/charge_price_ac_input" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" android:maxLength="10" android:minHeight="72dp"/>
    </com.google.android.material.textfield.TextInputLayout>
-   <com.google.android.material.button.MaterialButton android:id="@+id/charge_price_save" style="@style/Widget.EV.Button" android:layout_width="match_parent" android:layout_height="72dp" android:layout_marginTop="8dp" android:text="Fiyatı kaydet"/>
+   <com.google.android.material.textfield.TextInputLayout android:id="@+id/charge_price_dc_layout" style="@style/Widget.Material3.TextInputLayout.OutlinedBox" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="DC Birim Fiyat (≥ 8 kW)" app:suffixText="₺/kWh">
+    <com.google.android.material.textfield.TextInputEditText android:id="@+id/charge_price_dc_input" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" android:maxLength="10" android:minHeight="72dp"/>
+   </com.google.android.material.textfield.TextInputLayout>
+   <com.google.android.material.button.MaterialButton android:id="@+id/charge_price_save" style="@style/Widget.EV.Button" android:layout_width="match_parent" android:layout_height="72dp" android:layout_marginTop="12dp" android:text="Fiyatları kaydet"/>
   </LinearLayout>
+
+  <!-- Şarj Eğrisi -->
   <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:layout_marginTop="16dp" android:background="@drawable/bg_glass">
    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="ŞARJ EĞRİSİ" android:textAppearance="@style/Text.EV.Eyebrow"/>
    <com.evsuite.abrp.ChargingGraphView android:id="@+id/charge_graph" android:layout_width="match_parent" android:layout_height="280dp" android:layout_marginTop="12dp"/>

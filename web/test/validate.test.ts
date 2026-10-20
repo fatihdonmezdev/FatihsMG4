@@ -59,6 +59,9 @@ test("a charging session must match the id in its path", () => {
     isDemo: true,
     startSocPercent: 18,
     endSocPercent: 72,
+    chargingType: "DC",
+    latitude: 41.0082,
+    longitude: 28.9784,
     curve: [{ timestampMs: 1_760_000_060_000, powerKw: 84.2, socPercent: 20 }],
   };
   const record = validateChargingSession(body, SESSION);
@@ -68,6 +71,9 @@ test("a charging session must match the id in its path", () => {
   assert.equal(record.gridEnergyKwh, 34.54);
   assert.equal(record.totalCost, 259.05);
   assert.equal(record.isDemo, true);
+  assert.equal(record.chargingType, "DC");
+  assert.equal(record.latitude, 41.0082);
+  assert.equal(record.longitude, 28.9784);
   assert.throws(() => validateChargingSession(body, "11111111-2222-4333-8444-555555555556"), ValidationError);
 });
 

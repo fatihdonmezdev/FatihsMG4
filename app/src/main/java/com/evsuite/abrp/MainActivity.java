@@ -95,10 +95,14 @@ public class MainActivity extends AppCompatActivity {
     private TextInputLayout consumptionSohLayout;
     private TextInputEditText consumptionSohInput;
     private java.time.LocalDate selectedConsumptionDate = java.time.LocalDate.now();
-    private TextView chargeStatus, chargeSoc, chargeStartSoc, chargeVoltage, chargeCurrent, chargePower,
-            chargeEnergy, chargeGridEnergy, chargeDuration, chargeTotalCost, chargeCurveTable;
-    private TextInputLayout chargePriceLayout;
-    private TextInputEditText chargePriceInput;
+    private TextView chargeStatus, chargeType, chargeSoc, chargeStartSoc, chargeVoltage, chargeCurrent, chargePower,
+            chargeEnergy, chargeGridEnergy, chargeDuration, chargeUnitPrice, chargeTotalCost, chargeLocation, chargeCurveTable;
+    private TextView chargeBoxBatteryEnergy, chargeBoxBatterySub, chargeBoxGridEnergy, chargeBoxGridSub, chargeGridLabel;
+    private MaterialButton chargeTabAc, chargeTabDc;
+    private String chargingViewFilter = "AC";
+    private EnergySnapshot lastEnergySnapshot;
+    private TextInputLayout chargePriceAcLayout, chargePriceDcLayout;
+    private TextInputEditText chargePriceAcInput, chargePriceDcInput;
     private ChargeSessionTracker chargeSessionTracker;
     private ChargingGraphView chargeGraph;
 
@@ -507,7 +511,15 @@ public class MainActivity extends AppCompatActivity {
 
     private void bindChargingPane() {
         chargeSessionTracker = ChargeSessionTracker.get(this);
+        chargeTabAc = chargingPane.findViewById(R.id.charge_tab_ac);
+        chargeTabDc = chargingPane.findViewById(R.id.charge_tab_dc);
+        chargeBoxBatteryEnergy = chargingPane.findViewById(R.id.charge_box_battery_energy);
+        chargeBoxBatterySub = chargingPane.findViewById(R.id.charge_box_battery_sub);
+        chargeBoxGridEnergy = chargingPane.findViewById(R.id.charge_box_grid_energy);
+        chargeBoxGridSub = chargingPane.findViewById(R.id.charge_box_grid_sub);
+        chargeGridLabel = chargingPane.findViewById(R.id.charge_grid_label);
         chargeStatus = chargingPane.findViewById(R.id.charge_status);
+        chargeType = chargingPane.findViewById(R.id.charge_type);
         chargeSoc = chargingPane.findViewById(R.id.charge_soc);
         chargeStartSoc = chargingPane.findViewById(R.id.charge_start_soc);
         chargeVoltage = chargingPane.findViewById(R.id.charge_voltage);
@@ -516,54 +528,158 @@ public class MainActivity extends AppCompatActivity {
         chargeEnergy = chargingPane.findViewById(R.id.charge_energy);
         chargeGridEnergy = chargingPane.findViewById(R.id.charge_grid_energy);
         chargeDuration = chargingPane.findViewById(R.id.charge_duration);
+        chargeUnitPrice = chargingPane.findViewById(R.id.charge_unit_price);
         chargeTotalCost = chargingPane.findViewById(R.id.charge_total_cost);
+        chargeLocation = chargingPane.findViewById(R.id.charge_location);
         chargeGraph = chargingPane.findViewById(R.id.charge_graph);
         chargeCurveTable = chargingPane.findViewById(R.id.charge_curve_table);
-        chargePriceLayout = chargingPane.findViewById(R.id.charge_price_layout);
-        chargePriceInput = chargingPane.findViewById(R.id.charge_price_input);
-        chargePriceInput.setText(String.format(java.util.Locale.US, "%.2f",
-                chargeSessionTracker.pricePerKwh()));
-        chargingPane.findViewById(R.id.charge_price_save).setOnClickListener(v -> saveChargePrice());
+        chargePriceAcLayout = chargingPane.findViewById(R.id.charge_price_ac_layout);
+        chargePriceAcInput = chargingPane.findViewById(R.id.charge_price_ac_input);
+        chargePriceDcLayout = chargingPane.findViewById(R.id.charge_price_dc_layout);
+        chargePriceDcInput = chargingPane.findViewById(R.id.charge_price_dc_input);
+        chargePriceAcInput.setText(String.format(java.util.Locale.US, "%.2f",
+                chargeSessionTracker.priceAcPerKwh()));
+        chargePriceDcInput.setText(String.format(java.util.Locale.US, "%.2f",
+                chargeSessionTracker.priceDcPerKwh()));
+        chargingPane.findViewById(R.id.charge_price_save).setOnClickListener(v -> saveChargePrices());
+
+        if (chargeTabAc != null && chargeTabDc != null) {
+            chargeTabAc.setOnClickListener(v -> {
+                chargingViewFilter = "AC";
+                updateChargeTabButtons();
+                if (lastEnergySnapshot != null) {
+                    refreshCharging(lastEnergySnapshot);
+                }
+            });
+            chargeTabDc.setOnClickListener(v -> {
+                chargingViewFilter = "DC";
+                updateChargeTabButtons();
+                if (lastEnergySnapshot != null) {
+                    refreshCharging(lastEnergySnapshot);
+                }
+            });
+            updateChargeTabButtons();
+        }
     }
 
-    private void saveChargePrice() {
-        String raw = textOf(chargePriceInput).replace(',', '.');
+    private void updateChargeTabButtons() {
+        if (chargeTabAc == null || chargeTabDc == null) return;
+        boolean isAc = "AC".equalsIgnoreCase(chargingViewFilter);
+        chargeTabAc.setSelected(isAc);
+        chargeTabAc.setTextColor(isAc ? 0xFFD8C39A : COLOR_PENDING);
+        chargeTabAc.setStrokeColor(android.content.res.ColorStateList.valueOf(
+                isAc ? 0xFFD8C39A : 0xFF3A4143));
+
+        boolean isDc = "DC".equalsIgnoreCase(chargingViewFilter);
+        chargeTabDc.setSelected(isDc);
+        chargeTabDc.setTextColor(isDc ? 0xFFD8C39A : COLOR_PENDING);
+        chargeTabDc.setStrokeColor(android.content.res.ColorStateList.valueOf(
+                isDc ? 0xFFD8C39A : 0xFF3A4143));
+    }
+
+    private void saveChargePrices() {
+        boolean ok = true;
+        String rawAc = textOf(chargePriceAcInput).replace(',', '.');
         try {
-            double value = Double.parseDouble(raw);
-            if (!chargeSessionTracker.setPricePerKwh(value)) throw new NumberFormatException();
-            chargePriceLayout.setError(null);
-            chargePriceInput.setText(String.format(java.util.Locale.US, "%.2f", value));
-            Toast.makeText(this, "Şarj fiyatı kaydedildi", Toast.LENGTH_SHORT).show();
+            double value = Double.parseDouble(rawAc);
+            if (!chargeSessionTracker.setPriceAcPerKwh(value)) throw new NumberFormatException();
+            chargePriceAcLayout.setError(null);
+            chargePriceAcInput.setText(String.format(java.util.Locale.US, "%.2f", value));
         } catch (NumberFormatException e) {
-            chargePriceLayout.setError("Geçerli bir ₺/kWh değeri girin");
+            chargePriceAcLayout.setError("Geçerli bir ₺/kWh değeri girin");
+            ok = false;
+        }
+
+        String rawDc = textOf(chargePriceDcInput).replace(',', '.');
+        try {
+            double value = Double.parseDouble(rawDc);
+            if (!chargeSessionTracker.setPriceDcPerKwh(value)) throw new NumberFormatException();
+            chargePriceDcLayout.setError(null);
+            chargePriceDcInput.setText(String.format(java.util.Locale.US, "%.2f", value));
+        } catch (NumberFormatException e) {
+            chargePriceDcLayout.setError("Geçerli bir ₺/kWh değeri girin");
+            ok = false;
+        }
+
+        if (ok) {
+            Toast.makeText(this, "Şarj fiyatları kaydedildi", Toast.LENGTH_SHORT).show();
         }
     }
 
     private void refreshCharging(EnergySnapshot s) {
         if (chargeStatus == null) return;
+        lastEnergySnapshot = s;
         chargeSessionTracker.sample(s);
         Integer code = s.getChargingStatus();
         boolean charging = ChargingState.isCharging(
                 code, s.getChargePortConnected(), s.getBatteryPowerKw(), s.getSpeedKmh());
-        ChargeSessionTracker.Snapshot session = chargeSessionTracker.snapshot();
-        // Only DC is metered, so an AC charge must say so rather than let the readouts
-        // below — which then describe the previous DC session — be read as this charge.
         boolean dc = ChargingState.isDcCharging(
                 code, s.getChargePortConnected(), s.getBatteryPowerKw(), s.getSpeedKmh());
-        chargeStatus.setText(dc ? "DC hızlı şarj"
-                : charging ? "AC şarj (ölçülmüyor)"
-                : (session.startedAtMs > 0 ? "Son şarj" : "Şarj yok"));
+
+        ChargeSessionTracker.Snapshot session = chargeSessionTracker.snapshot(chargingViewFilter);
+        boolean isActive = session.charging;
+
+        if (charging) {
+            String activeType = dc ? "DC" : "AC";
+            if (activeType.equalsIgnoreCase(session.chargingType) && isActive) {
+                chargeStatus.setText(dc ? "DC hızlı şarj sürüyor (≥ 8 kW)" : "AC şarj sürüyor (< 8 kW)");
+            } else {
+                chargeStatus.setText("Son " + session.chargingType + " şarj kaydı (Araç " + activeType + " şarjda)");
+            }
+        } else {
+            if (session.startedAtMs > 0) {
+                chargeStatus.setText("Son " + session.chargingType + " şarj kaydı");
+            } else {
+                chargeStatus.setText(chargingViewFilter + " şarj kaydı yok");
+            }
+        }
+
+        String energyStr = session.startedAtMs > 0 ?
+                String.format(java.util.Locale.getDefault(), "%.2f kWh", session.energyKwh) : "—";
+        String gridEnergyStr = session.startedAtMs > 0 ?
+                String.format(java.util.Locale.getDefault(), "%.2f kWh", session.gridEnergyKwh) : "—";
+        String lossStr = session.startedAtMs > 0 ?
+                String.format(java.util.Locale.getDefault(), "%%%.1f kayıp dahil", session.lossPercent) : "Sapma / kayıp dahil";
+
+        if (chargeBoxBatteryEnergy != null) chargeBoxBatteryEnergy.setText(energyStr);
+        if (chargeBoxBatterySub != null) chargeBoxBatterySub.setText(session.startedAtMs > 0 ? "Net batarya enerjisi" : "Net batarya enerjisi");
+        if (chargeBoxGridEnergy != null) chargeBoxGridEnergy.setText(gridEnergyStr);
+        if (chargeBoxGridSub != null) chargeBoxGridSub.setText(lossStr);
+
+        if (chargeType != null) {
+            chargeType.setText(session.startedAtMs > 0 ? session.chargingType : (charging ? (dc ? "DC" : "AC") : chargingViewFilter));
+        }
         chargeSoc.setText(fmt(s.getSocPercent(), "%.1f %%"));
         chargeStartSoc.setText(fmt(session.startSocPercent, "%.1f %%"));
         chargeVoltage.setText(fmt(s.getBatteryVoltageV(), "%.1f V"));
         chargeCurrent.setText(fmt(s.getBatteryCurrentA(), "%.1f A"));
         chargePower.setText(s.getBatteryPowerKw() == null ? "—" : String.format(java.util.Locale.getDefault(), "%.1f kW", Math.abs(s.getBatteryPowerKw())));
-        chargeEnergy.setText(session.startedAtMs > 0 ? String.format(java.util.Locale.getDefault(), "%.2f kWh", session.energyKwh) : "—");
-        chargeGridEnergy.setText(session.startedAtMs > 0 ? String.format(
-                java.util.Locale.getDefault(), "%.2f kWh", session.gridEnergyKwh) : "—");
+        chargeEnergy.setText(energyStr);
+        chargeGridEnergy.setText(gridEnergyStr);
+        if (chargeGridLabel != null) {
+            chargeGridLabel.setText(session.startedAtMs > 0 ?
+                    String.format(java.util.Locale.getDefault(), "Şebekeden (%%%.1f kayıp)", session.lossPercent)
+                    : "Şebekeden alınan");
+        }
         long sec = session.durationSeconds;
         chargeDuration.setText(session.startedAtMs > 0 ? String.format(java.util.Locale.getDefault(), "%02d:%02d:%02d", sec/3600,(sec%3600)/60,sec%60) : "—");
+        if (chargeUnitPrice != null) {
+            chargeUnitPrice.setText(session.startedAtMs > 0 ? String.format(java.util.Locale.getDefault(), "%.2f ₺/kWh (%s)", session.pricePerKwh, session.chargingType) : "—");
+        }
         chargeTotalCost.setText(session.startedAtMs > 0 ? String.format(java.util.Locale.getDefault(), "%.2f ₺", session.totalCost) : "—");
+        if (chargeLocation != null) {
+            if (session.latitude != null && session.longitude != null) {
+                chargeLocation.setText(String.format(java.util.Locale.US, "%.4f, %.4f", session.latitude, session.longitude));
+            } else {
+                Double lat = VehicleLocationProvider.get(this).getLatitude();
+                Double lon = VehicleLocationProvider.get(this).getLongitude();
+                if (lat != null && lon != null) {
+                    chargeLocation.setText(String.format(java.util.Locale.US, "%.4f, %.4f", lat, lon));
+                } else {
+                    chargeLocation.setText("—");
+                }
+            }
+        }
         chargeGraph.setPoints(session.points);
         chargeCurveTable.setText(chargeGraph.tableText());
     }

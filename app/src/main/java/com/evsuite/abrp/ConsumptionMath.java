@@ -10,12 +10,13 @@ package com.evsuite.abrp;
  * or a regeneration-discarding gross fallback. Three sources, three answers, none of them
  * agreeing with the car's dashboard — the counters were not measuring the same quantity.
  *
- * Only moving intervals belong to these driving counters. Parked HVAC/accessory use is
- * deliberately excluded from distance, energy, time and SOC-drop totals. What the vehicle
- * reports while moving is net DC battery power: positive out of the pack, negative in.
- * Integrating it as-is means regeneration subtracts, which is exactly what the car's own
- * kWh figure does. Discarding the negative half (the old {@code max(0, kW)} fallback) is
- * what made our number read high.
+ * Moving and idling intervals both belong to these driving counters. Parked/idle HVAC
+ * and accessory power (draw while speed is 0 or below the deadband) is fully included
+ * in consumed energy, elapsed time, and SOC-drop totals, exactly matching DriveHub_Dort.
+ * What the vehicle reports while moving is net DC battery power: positive out of the pack,
+ * negative in. Integrating it as-is means regeneration subtracts, which is exactly what
+ * the car's own kWh figure does. Discarding the negative half (the old {@code max(0, kW)}
+ * fallback) is what made our number read high.
  */
 final class ConsumptionMath {
 
@@ -72,25 +73,38 @@ final class ConsumptionMath {
         float previous = previousSpeedKmh != null ? Math.abs(previousSpeedKmh) : current;
         float effectiveKmh = (previous + current) * 0.5f;
         if (effectiveKmh < SPEED_DEAD_BAND_KMH) {
-            return new Step(0d, 0d, 0d, 0d);
-        } else if (effectiveKmh > 90f) effectiveKmh *= 1.0035f;
-        else if (effectiveKmh > 30f) effectiveKmh *= 1.0015f;
+            effectiveKmh = 0f;
+        } else if (effectiveKmh > 90f) {
+            effectiveKmh *= 1.0035f;
+        } else if (effectiveKmh > 30f) {
+            effectiveKmh *= 1.0015f;
+        }
         double km = effectiveKmh * hours;
 
-        // Energy: trapezoidal net DC power, regeneration included with its own sign.
+        // Energy: trapezoidal net DC power, matching DriveHub_Dort.
+        // At standstill (current == 0 or effectiveKmh == 0), if power is negative (inbound charge/noise),
+        // drivedKwh is 0. But positive power at standstill (idle HVAC, accessories, electronics)
+        // is fully integrated as consumption.
+        // When vehicle is charging (on charger), driving energy is not accumulated.
         double kwh = 0d;
-        if (powerKw != null && Math.abs(powerKw) <= MAX_PLAUSIBLE_KW) {
+        if (!charging && powerKw != null && Math.abs(powerKw) <= MAX_PLAUSIBLE_KW) {
             double effectiveKw = previousPowerKw != null && Math.abs(previousPowerKw) <= MAX_PLAUSIBLE_KW
                     ? (previousPowerKw + powerKw) * 0.5d
                     : powerKw;
-            kwh = effectiveKw * hours;
+            if ((current == 0f || effectiveKmh == 0f) && (powerKw < 0f || effectiveKw < 0d)) {
+                kwh = 0d;
+            } else {
+                kwh = effectiveKw * hours;
+            }
         }
+
+        double stepHours = charging ? 0d : hours;
 
         double socDrop = (!charging && previousSocPercent != null && socPercent != null)
                 ? previousSocPercent - socPercent
                 : 0d;
 
-        return new Step(km, kwh, hours, socDrop);
+        return new Step(km, kwh, stepHours, socDrop);
     }
 
     private ConsumptionMath() { }

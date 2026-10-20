@@ -31,14 +31,11 @@ final class ChargingState {
      * @param speedKmh      road speed, null when unreadable
      */
     /**
-     * Inbound power at or above which a charge is metered as a session.
-     *
-     * AC charging on this car tops out around 7 kW; anything past 10 kW can only be DC.
-     * The session meter only runs on DC by the owner's choice: an AC charge is an
-     * overnight affair the head unit sleeps through, so its curve, its duration and its
-     * energy total are all guesses, whereas a DC stop happens with the car awake.
+     * Inbound power at or above which a charge is classified as DC rather than AC.
+     * Below 8 kW is AC charging, 8 kW and above is DC charging.
      */
-    static final float DC_MIN_KW = 10f;
+    static final float AC_DC_THRESHOLD_KW = 8.0f;
+    static final float DC_MIN_KW = AC_DC_THRESHOLD_KW;
 
     static boolean isCharging(Integer status, Boolean portConnected, Float powerKw, Float speedKmh) {
         if (status != null && (status == STATUS_AC_CHARGING || status == STATUS_DC_CHARGING)) {
@@ -53,15 +50,17 @@ final class ChargingState {
     }
 
     /**
-     * Is this a DC fast charge — the only kind the session meter records?
-     *
-     * Deliberately stricter than {@link #isCharging}: the general test exists so the
-     * consumption counters do not book a charge as a drive, and it must stay permissive
-     * for that. This one gates a measurement, so an unreadable power value is a no.
+     * Determines whether the current charging power indicates DC fast charging (>= 8 kW) or AC (< 8 kW).
      */
     static boolean isDcCharging(Integer status, Boolean portConnected, Float powerKw, Float speedKmh) {
-        if (powerKw == null || !Float.isFinite(powerKw) || -powerKw < DC_MIN_KW) return false;
+        if (powerKw == null || !Float.isFinite(powerKw) || -powerKw < AC_DC_THRESHOLD_KW) return false;
         return isCharging(status, portConnected, powerKw, speedKmh);
+    }
+
+    static String chargingType(Float powerKw, Integer status) {
+        if (status != null && status == STATUS_DC_CHARGING) return "DC";
+        if (powerKw != null && Math.abs(powerKw) >= AC_DC_THRESHOLD_KW) return "DC";
+        return "AC";
     }
 
     private ChargingState() { }

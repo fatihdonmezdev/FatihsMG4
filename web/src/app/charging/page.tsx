@@ -15,7 +15,7 @@ export default async function ChargingPage() {
       <Shell active="/charging" title="Şarj">
         <div className="card">
           <p className="empty">
-            Şarj kaydı yok. Yalnızca 10 kW üstü DC şarjlar ölçülür; AC şarj kaydedilmez.
+            Henüz şarj kaydı yok.
           </p>
         </div>
       </Shell>
@@ -25,10 +25,10 @@ export default async function ChargingPage() {
   const total = sumCharging(sessions);
 
   return (
-    <Shell active="/charging" title="Şarj" subtitle={`${sessions.length} DC seans`}>
+    <Shell active="/charging" title="Şarj" subtitle={`${sessions.length} seans (AC & DC)`}>
       <div className="tiles">
         <Tile label="Bataryaya giren net" value={precise(total.energyKwh)} unit="kWh" tone="gold" />
-        <Tile label="Şebekeden alınan (+%10)" value={precise(total.gridEnergyKwh)} unit="kWh" tone="gold" />
+        <Tile label="Şebekeden alınan (kayıp dahil)" value={precise(total.gridEnergyKwh)} unit="kWh" tone="gold" />
         <Tile label="Toplam ödenen" value={money(total.cost)} tone="gold" />
         <Tile
           label="Ortalama birim"
@@ -58,6 +58,10 @@ export default async function ChargingPage() {
                       <div className="session-when">{dateTime(session.startedAt)}</div>
                       <div className="session-meta">
                         {session.isDemo && "Demo · "}
+                        <span style={{ fontWeight: 600, color: session.chargingType === "DC" ? "#f4a261" : "#2a9d8f" }}>
+                          {session.chargingType ?? (peak >= 8 || average >= 8 ? "DC" : "AC")}
+                        </span>
+                        {" · "}
                         {duration(session.durationSeconds)}
                         {gained !== null && ` · %${num(session.startSocPercent as number)} → %${num(session.endSocPercent as number)}`}
                       </div>
@@ -77,16 +81,35 @@ export default async function ChargingPage() {
                       }))}
                     />
                     <div className="rows" style={{ marginTop: 14 }}>
+                      <Row label="Şarj tipi" value={session.chargingType ? `${session.chargingType} (${session.chargingType === "DC" ? "≥ 8 kW Hızlı" : "< 8 kW Normal"})` : (peak >= 8 || average >= 8 ? "DC (≥ 8 kW Hızlı)" : "AC (< 8 kW Normal)")} />
                       <Row label="Başlangıç" value={dateTime(session.startedAt)} />
                       <Row label="Bitiş" value={dateTime(session.endedAt)} />
                       <Row label="Ölçülen süre" value={duration(session.durationSeconds)} />
                       <Row label="Bataryaya giren net" value={`${precise(session.energyKwh)} kWh`} />
-                      <Row label="Şebekeden alınan (+%10)" value={`${precise(session.gridEnergyKwh ?? session.energyKwh * 1.1)} kWh`} />
+                      <Row
+                        label={`Şebekeden alınan (${session.chargingLossPercent ? `+%${session.chargingLossPercent.toFixed(1)}` : "+%10"})`}
+                        value={`${precise(session.gridEnergyKwh ?? session.energyKwh * (1 + (session.chargingLossPercent ?? 10) / 100))} kWh`}
+                      />
                       <Row label="Kazanılan doluluk" value={gained === null ? "—" : `%${num(gained)}`} />
                       <Row label="Tepe güç" value={peak > 0 ? `${num(peak)} kW` : "—"} />
                       <Row label="Ortalama güç" value={average > 0 ? `${num(average)} kW` : "—"} />
                       <Row label="Birim fiyat" value={`${money(session.pricePerKwh)}/kWh`} />
                       <Row label="Tutar" value={money(session.totalCost)} />
+                      {session.latitude !== undefined && session.longitude !== undefined && (
+                        <Row
+                          label="Konum"
+                          value={
+                            <a
+                              href={`https://maps.google.com/?q=${session.latitude},${session.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: "#d8c39a", textDecoration: "underline" }}
+                            >
+                              {`${session.latitude.toFixed(4)}, ${session.longitude.toFixed(4)} ↗`}
+                            </a>
+                          }
+                        />
+                      )}
                     </div>
                   </div>
                 </details>

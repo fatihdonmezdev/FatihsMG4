@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.41
+
+### Added
+- Charging tab AC/DC switch buttons to toggle views between AC (< 8 kW) and DC (≥ 8 kW) sessions.
+- Prominent dual information cards: Net battery energy ("BATARYAYA GİREN") and Grid energy ("ŞEBEKEDEN ALINAN").
+- Calibrated AC charging loss curve based on charger observations: 6A -> 21%, 10A -> 11%, 16A -> 5% with linear interpolation.
+- Full AC charging session recording with vehicle sleep handling (47.0 kWh net usable pack capacity).
+- Separate AC and DC unit pricing inputs.
+- Vehicle GPS location tagging on charging sessions.
+- Seamless combination of actual station power telemetry (`PROP_CHR_AMP_EXP`) when present with calibrated AC loss fallback.
+
 ## 2.2.40
 
 ### Changed

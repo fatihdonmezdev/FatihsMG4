@@ -89,7 +89,7 @@ export function Tile({
   );
 }
 
-export function Row({ label, value }: { label: string; value: string }) {
+export function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="row">
       <span className="row-key">{label}</span>

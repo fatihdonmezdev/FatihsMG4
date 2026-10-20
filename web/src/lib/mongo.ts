@@ -43,12 +43,17 @@ export interface ChargingSession {
   durationSeconds: number;
   energyKwh: number;
   chargingLossPercent: number;
+  stationEnergyKwh?: number;
   gridEnergyKwh: number;
   pricePerKwh: number;
   totalCost: number;
   isDemo?: boolean;
   startSocPercent?: number;
   endSocPercent?: number;
+  chargingType?: "AC" | "DC";
+  initialPowerKw?: number;
+  latitude?: number;
+  longitude?: number;
   curve: CurvePoint[];
   createdAt: Date;
   updatedAt: Date;

@@ -32,13 +32,13 @@ public class ConsumptionMathTest {
     }
 
     @Test
-    public void speedBelowTheDeadBandContributesNothingToDrivingTotals() {
+    public void speedBelowTheDeadBandContributesNoDistanceButAccumulatesEnergyAndTime() {
         ConsumptionMath.Step step =
                 ConsumptionMath.integrate(DT, 2f, 2f, 8f, 8f, 80f, 79f, false);
         assertEquals(0d, step.km, TOLERANCE);
-        assertEquals(0d, step.kwh, TOLERANCE);
-        assertEquals(0d, step.hours, TOLERANCE);
-        assertEquals(0d, step.socDrop, TOLERANCE);
+        assertEquals(8d * DT, step.kwh, TOLERANCE);
+        assertEquals(DT, step.hours, TOLERANCE);
+        assertEquals(1d, step.socDrop, TOLERANCE);
     }
 
     @Test
@@ -73,11 +73,12 @@ public class ConsumptionMathTest {
     }
 
     @Test
-    public void parkedClimateUseIsExcludedFromDrivingConsumption() {
+    public void standstillPowerFlowingOutStillCounts() {
         ConsumptionMath.Step step =
                 ConsumptionMath.integrate(DT, 0f, 0f, 2f, 2f, null, null, false);
-        assertEquals(0d, step.kwh, TOLERANCE);
-        assertEquals(0d, step.hours, TOLERANCE);
+        assertEquals(0d, step.km, TOLERANCE);
+        assertEquals(2d * DT, step.kwh, TOLERANCE);
+        assertEquals(DT, step.hours, TOLERANCE);
     }
 
     @Test

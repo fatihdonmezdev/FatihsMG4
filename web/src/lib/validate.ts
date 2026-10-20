@@ -55,8 +55,25 @@ export function validateChargingSession(body: unknown, pathSessionId: string): C
   const isDemo = record.isDemo;
   const energyKwh = bounded(record.energyKwh, 0, 1000, "energyKwh");
   const pricePerKwh = bounded(record.pricePerKwh, 0, 1_000_000, "pricePerKwh");
-  const chargingLossPercent = 10;
-  const gridEnergyKwh = energyKwh * 1.1;
+  const chargingLossPercent = typeof record.chargingLossPercent === "number" && Number.isFinite(record.chargingLossPercent) && record.chargingLossPercent >= 0 && record.chargingLossPercent <= 100
+    ? record.chargingLossPercent
+    : 10;
+  const stationEnergyKwh = typeof record.stationEnergyKwh === "number" && Number.isFinite(record.stationEnergyKwh) && record.stationEnergyKwh >= 0
+    ? bounded(record.stationEnergyKwh, 0, 1000, "stationEnergyKwh")
+    : undefined;
+  const gridEnergyKwh = typeof record.gridEnergyKwh === "number" && Number.isFinite(record.gridEnergyKwh) && record.gridEnergyKwh >= 0
+    ? bounded(record.gridEnergyKwh, 0, 1000, "gridEnergyKwh")
+    : (stationEnergyKwh && stationEnergyKwh > 0 ? stationEnergyKwh : energyKwh * (1 + chargingLossPercent / 100));
+  const chargingType: "AC" | "DC" = record.chargingType === "DC" || record.chargingType === "AC"
+    ? record.chargingType
+    : (energyKwh > 0 && typeof record.durationSeconds === "number" && record.durationSeconds > 0 && (energyKwh * 3600) / record.durationSeconds >= 8)
+      ? "DC" : "AC";
+  const latitude = typeof record.latitude === "number" && Number.isFinite(record.latitude) && Math.abs(record.latitude) <= 90
+    ? record.latitude : undefined;
+  const longitude = typeof record.longitude === "number" && Number.isFinite(record.longitude) && Math.abs(record.longitude) <= 180
+    ? record.longitude : undefined;
+  const initialPowerKw = typeof record.initialPowerKw === "number" && Number.isFinite(record.initialPowerKw) && record.initialPowerKw >= 0
+    ? bounded(record.initialPowerKw, 0, 1000, "initialPowerKw") : undefined;
   return {
     installationId: validateUuid(record.installationId, "installationId"),
     sessionId,
@@ -65,12 +82,17 @@ export function validateChargingSession(body: unknown, pathSessionId: string): C
     durationSeconds: bounded(record.durationSeconds, 0, 604800, "durationSeconds"),
     energyKwh,
     chargingLossPercent,
+    stationEnergyKwh,
     gridEnergyKwh,
     pricePerKwh,
     totalCost: gridEnergyKwh * pricePerKwh,
+    chargingType,
     ...(isDemo === true ? { isDemo: true } : {}),
     ...(startSocPercent === undefined ? {} : { startSocPercent: bounded(startSocPercent, 0, 100, "startSocPercent") }),
     ...(endSocPercent === undefined ? {} : { endSocPercent: bounded(endSocPercent, 0, 100, "endSocPercent") }),
+    ...(latitude === undefined ? {} : { latitude }),
+    ...(longitude === undefined ? {} : { longitude }),
+    ...(initialPowerKw === undefined ? {} : { initialPowerKw }),
     curve,
   };
 }

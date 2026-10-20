@@ -39,7 +39,7 @@ export default async function OverviewPage() {
           label="Şebekeden alınan"
           value={precise(charge.gridEnergyKwh)}
           unit="kWh"
-          note={`${charge.sessions} DC şarj`}
+          note={`${charge.sessions} şarj`}
           tone="gold"
         />
         <Tile
@@ -68,8 +68,12 @@ export default async function OverviewPage() {
           <h2 className="card-title">Son şarj</h2>
           <div className="rows">
             <Row label="Tarih" value={dateTime(lastSession.startedAt)} />
+            <Row label="Şarj tipi" value={lastSession.chargingType ? `${lastSession.chargingType} (${lastSession.chargingType === "DC" ? "≥ 8 kW Hızlı" : "< 8 kW Normal"})` : "—"} />
             <Row label="Bataryaya giren net" value={`${precise(lastSession.energyKwh)} kWh`} />
-            <Row label="Şebekeden alınan (+%10)" value={`${precise(lastSession.gridEnergyKwh ?? lastSession.energyKwh * 1.1)} kWh`} />
+            <Row
+              label={`Şebekeden alınan (${lastSession.chargingLossPercent ? `+%${lastSession.chargingLossPercent.toFixed(1)}` : "+%10"})`}
+              value={`${precise(lastSession.gridEnergyKwh ?? lastSession.energyKwh * (1 + (lastSession.chargingLossPercent ?? 10) / 100))} kWh`}
+            />
             <Row
               label="Doluluk"
               value={
@@ -80,6 +84,21 @@ export default async function OverviewPage() {
             />
             <Row label="Süre" value={duration(lastSession.durationSeconds)} />
             <Row label="Ücret" value={money(lastSession.totalCost)} />
+            {lastSession.latitude !== undefined && lastSession.longitude !== undefined && (
+              <Row
+                label="Konum"
+                value={
+                  <a
+                    href={`https://maps.google.com/?q=${lastSession.latitude},${lastSession.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "#d8c39a", textDecoration: "underline" }}
+                  >
+                    {`${lastSession.latitude.toFixed(4)}, ${lastSession.longitude.toFixed(4)} ↗`}
+                  </a>
+                }
+              />
+            )}
           </div>
         </section>
       )}

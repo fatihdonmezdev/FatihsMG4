@@ -73,12 +73,16 @@ public class ChargingStateTest {
     }
 
     @Test
-    public void onlyDcSpeedChargingIsMetered() {
-        // The session meter runs on DC alone: 7 kW is a home charge the head unit sleeps
-        // through, so its curve and duration would be fiction.
+    public void dcThresholdIsEightKw() {
         assertFalse(ChargingState.isDcCharging(1, Boolean.TRUE, -7f, 0f));
+        assertFalse(ChargingState.isDcCharging(null, null, -7.9f, 0f));
         assertTrue(ChargingState.isDcCharging(10, Boolean.TRUE, -50f, 0f));
+        assertTrue(ChargingState.isDcCharging(null, null, -8.0f, 0f));
         assertTrue(ChargingState.isDcCharging(null, null, -10f, 0f));
+
+        org.junit.Assert.assertEquals("AC", ChargingState.chargingType(-7.5f, 1));
+        org.junit.Assert.assertEquals("DC", ChargingState.chargingType(-8.0f, null));
+        org.junit.Assert.assertEquals("DC", ChargingState.chargingType(-50.0f, 10));
     }
 
     @Test
