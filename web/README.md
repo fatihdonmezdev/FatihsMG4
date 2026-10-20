@@ -1,4 +1,7 @@
-# FatihsMG4 web
+# FatihsMG4 web (DEPRECATED & MERGED)
+
+> [!NOTE]
+> **Bu standalone web app devre dışı bırakılmıştır.** Tüm telemetri API servisleri (`/v1/...`), MongoDB entegrasyonu, Tüketim (`/consumption`) ve Şarj (`/charging`) gösterge panelleri tek çatı altında **`mg-web-app`** projesine taşınmıştır.
 
 Next.js app on Vercel: the ingest API the car writes to, and a phone-shaped dashboard for
 reading the history back. Replaces the standalone Express service that used to live in

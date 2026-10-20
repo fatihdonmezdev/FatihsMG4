@@ -39,8 +39,8 @@ android {
 
         // MongoDB credentials never ship in the APK. The app only talks to the small
         // authenticated API in server/, which owns the database connection.
-        buildConfigField "String", "CONSUMPTION_API_URL", "\"${System.getenv('CONSUMPTION_API_URL') ?: ''}\""
-        buildConfigField "String", "CONSUMPTION_API_TOKEN", "\"${System.getenv('CONSUMPTION_API_TOKEN') ?: ''}\""
+        buildConfigField "String", "CONSUMPTION_API_URL", "\"${System.getenv('CONSUMPTION_API_URL') ?: project.findProperty('consumption.api.url') ?: ''}\""
+        buildConfigField "String", "CONSUMPTION_API_TOKEN", "\"${System.getenv('CONSUMPTION_API_TOKEN') ?: project.findProperty('consumption.api.token') ?: '066da6fc58a0fcd8a35deccb29e43ef7a0b3bcda5a3c2b99db86e64a5b982ec6'}\""
         // Fixed installation identity: baked into every build so an APK wipe cannot orphan
         // the cloud history under a new random UUID. The car's own consumption history lives
         // under this id in the daily_consumption collection.
