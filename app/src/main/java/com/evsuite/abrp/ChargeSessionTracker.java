@@ -420,17 +420,15 @@ final class ChargeSessionTracker {
         }
 
         double effectiveGridKwh() {
-            if (stationEnergyKwh > 0.05d) {
+            if (stationEnergyKwh > 0.05d && stationEnergyKwh >= energyKwh) {
                 return stationEnergyKwh;
             }
             return gridEnergyKwh(energyKwh, lossPercent);
         }
 
         double effectiveLossPercent() {
-            if (stationEnergyKwh > 0.05d && energyKwh > 0.05d) {
-                if (stationEnergyKwh >= energyKwh) {
-                    return ((stationEnergyKwh - energyKwh) / energyKwh) * 100d;
-                }
+            if (stationEnergyKwh > 0.05d && energyKwh > 0.05d && stationEnergyKwh >= energyKwh) {
+                return ((stationEnergyKwh - energyKwh) / energyKwh) * 100d;
             }
             return lossPercent;
         }
