@@ -1,7 +1,0 @@
-node_modules
-.next
-# Every .env variant is secret except the committed template.
-.env*
-!.env.example
-next-env.d.ts
-*.tsbuildinfo
