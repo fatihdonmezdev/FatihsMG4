@@ -12,7 +12,10 @@
     <string name="charging_title">Şarj</string>
     <string name="charging_subtitle">Canlı batarya değerleri ve SOC/güç eğrisi</string>
     <string name="tab_wifi">Wi-Fi</string>
+    <string name="tab_camera">Kamera</string>
     <string name="tab_log">Kayıtlar</string>
+    <string name="camera_title">Kamera</string>
+    <string name="camera_subtitle">70mai canlı kamera ve geri vites ayarları</string>
 
     <!-- Wi-Fi page -->
     <string name="wifi_card_title">Wi-Fi Bağlantısı</string>

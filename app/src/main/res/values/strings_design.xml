@@ -13,6 +13,8 @@
   <string name="design_service_subtitle">Verilerin arka planda g&#xFC;ncel kals&#x131;n.</string>
   <string name="design_wifi_title">Ba&#x11F;lant&#x131;da kal.</string>
   <string name="design_wifi_subtitle">Yolculu&#x11F;unun internet ba&#x11F;lant&#x131;s&#x131;.</string>
+  <string name="design_camera_title">Canl&#x131; g&#xF6;r&#xFC;&#x15F;.</string>
+  <string name="design_camera_subtitle">70mai kamera ak&#x131;&#x15F;&#x131; ve geri vites ayarlar&#x131;.</string>
   <string name="design_log_title">Her aktar&#x131;m, burada.</string>
   <string name="design_log_subtitle">Son g&#xF6;nderimlerin durumu ve ayr&#x131;nt&#x131;lar&#x131;.</string>
   <string name="design_battery">BATARYA</string>

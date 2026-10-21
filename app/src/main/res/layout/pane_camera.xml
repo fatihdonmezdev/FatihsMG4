@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:padding="20dp"
+    android:background="@color/ev_background">
+
+    <!-- Sol Kontrol Paneli -->
+    <LinearLayout
+        android:layout_width="380dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:background="@drawable/bg_glass">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="KAMERA KONTROLÜ"
+            android:textAppearance="@style/Text.EV.Eyebrow" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/camera_reverse_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="72dp"
+            android:text="Geri viteste otomatik göster"
+            android:textAppearance="@style/Text.EV.Body"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            app:useMaterialThemeColors="true"
+            app:thumbTint="@color/switch_thumb"
+            app:trackTint="@color/switch_track"
+            android:textColor="@color/ev_text_primary" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Geri vitese takıldığında sağ %65 alanda radarın üstünde otomatik açılır."
+            android:textAppearance="@style/Text.EV.Secondary" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#20FFFFFF"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="20dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="CANLI ÖNİZLEME"
+            android:textAppearance="@style/Text.EV.Eyebrow" />
+
+        <!-- Kamera Seçim Butonları -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_cam_front"
+                style="@style/Widget.EV.Button.Outlined"
+                android:layout_width="0dp"
+                android:layout_height="64dp"
+                android:layout_weight="1"
+                android:text="Ön Kamera"
+                android:textSize="14sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_cam_rear"
+                style="@style/Widget.EV.Button"
+                android:layout_width="0dp"
+                android:layout_height="64dp"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:text="Arka Kamera"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_cam_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Hazır"
+            android:textAppearance="@style/Text.EV.Secondary" />
+
+        <TextView
+            android:id="@+id/tv_cam_logs"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_input_panel"
+            android:padding="12dp"
+            android:text="Kamera sistemi hazır.\nWi-Fi: 70mai_A410_1d59\n"
+            android:textColor="#A1A1AA"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <Space
+        android:layout_width="20dp"
+        android:layout_height="1dp" />
+
+    <!-- Sağ Canlı Video Ekranı -->
+    <FrameLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="#000000">
+
+        <SurfaceView
+            android:id="@+id/cam_surface"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <TextView
+            android:id="@+id/tv_cam_title_overlay"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
+            android:layout_margin="16dp"
+            android:background="#80000000"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="6dp"
+            android:text="70mai Canlı Akış"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
+
+    </FrameLayout>
+
+</LinearLayout>

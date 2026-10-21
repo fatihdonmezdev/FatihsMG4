@@ -36,11 +36,16 @@ public class BootReceiver extends BroadcastReceiver {
         String action = intent.getAction();
         if (action == null || !START_ACTIONS.contains(action)) return;
 
-        Log.i(TAG, action + " — starting consumption service");
+        Log.i(TAG, action + " — starting consumption and reverse overlay service");
         try {
             context.startForegroundService(new Intent(context, AbrpUploadService.class));
         } catch (Exception e) {
-            Log.w(TAG, "startForegroundService failed: " + e.getMessage());
+            Log.w(TAG, "startForegroundService (AbrpUploadService) failed: " + e.getMessage());
+        }
+        try {
+            context.startForegroundService(new Intent(context, ReverseOverlayService.class));
+        } catch (Exception e) {
+            Log.w(TAG, "startForegroundService (ReverseOverlayService) failed: " + e.getMessage());
         }
     }
 }

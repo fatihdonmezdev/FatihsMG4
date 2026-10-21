@@ -7,6 +7,7 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
@@ -14,6 +15,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 import androidx.annotation.NonNull;
@@ -40,15 +42,17 @@ public class MainActivity extends AppCompatActivity {
     /** Navigation destinations in page order. Parallel to {@link #panes}. */
     private static final int[] TAB_IDS =
             { R.id.tabVehicle, R.id.tabConsumption, R.id.tabCharging, R.id.tabService, R.id.tabWifi,
-              R.id.tabLog };
+              R.id.tabCamera, R.id.tabLog };
 
     private static final int[] PAGE_TITLES = {
             R.string.design_overview_title, R.string.consumption_title, R.string.charging_title,
-            R.string.design_service_title, R.string.design_wifi_title, R.string.design_log_title
+            R.string.design_service_title, R.string.design_wifi_title, R.string.design_camera_title,
+            R.string.design_log_title
     };
     private static final int[] PAGE_SUBTITLES = {
             R.string.design_overview_subtitle, R.string.consumption_subtitle, R.string.charging_subtitle,
-            R.string.design_service_subtitle, R.string.design_wifi_subtitle, R.string.design_log_subtitle
+            R.string.design_service_subtitle, R.string.design_wifi_subtitle, R.string.design_camera_subtitle,
+            R.string.design_log_subtitle
     };
 
     // Status colours come from the palette, not from the Material swatches: #4CAF50 and
@@ -66,9 +70,21 @@ public class MainActivity extends AppCompatActivity {
     private View consumptionPane;
     private View chargingPane;
     private View wifiPane;
+    private View cameraPane;
 
-    /** The six pages in navigation order. Parallel to {@link #TAB_IDS}. */
+    /** The seven pages in navigation order. Parallel to {@link #TAB_IDS}. */
     private View[] panes;
+
+    // Camera Page components
+    private SurfaceView camSurface;
+    private TextView tvCamStatus, tvCamLogs, tvCamTitleOverlay;
+    private MaterialButton btnCamFront, btnCamRear;
+    private SwitchMaterial cameraReverseSwitch;
+    private org.videolan.libvlc.LibVLC camLibVLC;
+    private org.videolan.libvlc.MediaPlayer camMediaPlayer;
+    private String currentCamUrl = "rtsp://192.168.0.1:554/livestream/22";
+    private static final String FRONT_RTSP_URL = "rtsp://192.168.0.1:554/livestream/12";
+    private static final String REAR_RTSP_URL = "rtsp://192.168.0.1:554/livestream/22";
 
     /** Wi-Fi page. The helper is the same one the upload service uses on its own tick. */
     private WifiAutoConnect wifi;
@@ -209,13 +225,15 @@ public class MainActivity extends AppCompatActivity {
         consumptionPane = inflatePane(R.layout.pane_consumption);
         chargingPane = inflatePane(R.layout.pane_charging);
         wifiPane    = inflatePane(R.layout.pane_wifi);
+        cameraPane  = inflatePane(R.layout.pane_camera);
         logPane     = inflatePane(R.layout.pane_log);
-        panes = new View[] { vehiclePane, consumptionPane, chargingPane, servicePane, wifiPane, logPane };
+        panes = new View[] { vehiclePane, consumptionPane, chargingPane, servicePane, wifiPane, cameraPane, logPane };
 
         bindVehiclePane();
         bindConsumptionPane();
         bindChargingPane();
         bindWifiPane();
+        bindCameraPane();
 
         statusText          = servicePane.findViewById(R.id.status_text);
         callLogText = logPane.findViewById(R.id.call_log_text);
@@ -233,6 +251,7 @@ public class MainActivity extends AppCompatActivity {
         // startForegroundService is idempotent — if the service is already up this
         // is a no-op aside from delivering a new intent.
         startForegroundService(new Intent(this, AbrpUploadService.class));
+        startForegroundService(new Intent(this, ReverseOverlayService.class));
     }
 
     private void showAbout() {
@@ -276,6 +295,13 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
         // Stop polling off-screen: this activity has no reason to spend cycles then.
         uiHandler.removeCallbacks(uiRefresh);
+        stopLiveCamStream();
+    }
+
+    @Override
+    protected void onDestroy() {
+        stopLiveCamStream();
+        super.onDestroy();
     }
 
     // ---------- Update check ----------
@@ -378,6 +404,131 @@ public class MainActivity extends AppCompatActivity {
         wifiSavedList.setText(saved.isEmpty()
                 ? getString(R.string.wifi_saved_empty)
                 : android.text.TextUtils.join("\n", saved));
+    }
+
+    // ---------- Camera page ----------
+
+    private void bindCameraPane() {
+        camSurface = cameraPane.findViewById(R.id.cam_surface);
+        tvCamStatus = cameraPane.findViewById(R.id.tv_cam_status);
+        tvCamLogs = cameraPane.findViewById(R.id.tv_cam_logs);
+        tvCamTitleOverlay = cameraPane.findViewById(R.id.tv_cam_title_overlay);
+        btnCamFront = cameraPane.findViewById(R.id.btn_cam_front);
+        btnCamRear = cameraPane.findViewById(R.id.btn_cam_rear);
+        cameraReverseSwitch = cameraPane.findViewById(R.id.camera_reverse_switch);
+
+        boolean revEnabled = prefs.getBoolean(ReverseOverlayService.PREF_REVERSE_CAM_ENABLED, true);
+        cameraReverseSwitch.setChecked(revEnabled);
+        cameraReverseSwitch.setOnCheckedChangeListener((btn, checked) -> {
+            prefs.edit().putBoolean(ReverseOverlayService.PREF_REVERSE_CAM_ENABLED, checked).apply();
+            Toast.makeText(this, checked ? "Geri vites kamerası aktif edildi" : "Geri vites kamerası kapatıldı", Toast.LENGTH_SHORT).show();
+        });
+
+        btnCamFront.setOnClickListener(v -> switchLiveCamera(FRONT_RTSP_URL, "Ön Kamera"));
+        btnCamRear.setOnClickListener(v -> switchLiveCamera(REAR_RTSP_URL, "Arka Kamera"));
+
+        // Keep SurfaceView ready
+        camSurface.getHolder().addCallback(new android.view.SurfaceHolder.Callback() {
+            @Override
+            public void surfaceCreated(android.view.SurfaceHolder holder) {
+                // If on Camera page, start stream
+                startLiveCamStream(currentCamUrl);
+            }
+
+            @Override
+            public void surfaceChanged(android.view.SurfaceHolder holder, int format, int width, int height) {}
+
+            @Override
+            public void surfaceDestroyed(android.view.SurfaceHolder holder) {
+                stopLiveCamStream();
+            }
+        });
+    }
+
+    private void switchLiveCamera(String url, String label) {
+        currentCamUrl = url;
+        if (tvCamStatus != null) tvCamStatus.setText("Seçilen: " + label);
+        if (tvCamTitleOverlay != null) tvCamTitleOverlay.setText("70mai: " + label);
+        appendCamLog(label + " başlatılıyor: " + url);
+        startLiveCamStream(url);
+    }
+
+    private void startLiveCamStream(String url) {
+        try {
+            stopLiveCamStream();
+
+            ArrayList<String> options = new ArrayList<>();
+            options.add("--rtsp-tcp");
+            options.add("--network-caching=600");
+            options.add("--live-caching=600");
+            options.add("--no-audio");
+            options.add("--clock-jitter=0");
+            options.add("--clock-synchro=0");
+            options.add("--drop-late-frames");
+            options.add("--skip-frames");
+            options.add("--avcodec-hurry-up");
+
+            camLibVLC = new org.videolan.libvlc.LibVLC(this, options);
+            camMediaPlayer = new org.videolan.libvlc.MediaPlayer(camLibVLC);
+
+            if (camSurface != null && camSurface.getHolder().getSurface().isValid()) {
+                org.videolan.libvlc.interfaces.IVLCVout vout = camMediaPlayer.getVLCVout();
+                vout.setVideoView(camSurface);
+                vout.attachViews();
+            }
+
+            camMediaPlayer.setScale(0f);
+
+            org.videolan.libvlc.Media media = new org.videolan.libvlc.Media(camLibVLC, Uri.parse(url));
+            media.setHWDecoderEnabled(true, false);
+            media.addOption(":network-caching=600");
+            media.addOption(":live-caching=600");
+            media.addOption(":rtsp-tcp");
+            media.addOption(":clock-jitter=0");
+            media.addOption(":clock-synchro=0");
+            media.addOption(":drop-late-frames");
+            media.addOption(":skip-frames");
+
+            camMediaPlayer.setMedia(media);
+            media.release();
+
+            camMediaPlayer.setEventListener(event -> {
+                if (event.type == org.videolan.libvlc.MediaPlayer.Event.Playing) {
+                    runOnUiThread(() -> appendCamLog("Yayın aktif! (" + url + ")"));
+                } else if (event.type == org.videolan.libvlc.MediaPlayer.Event.EncounteredError) {
+                    runOnUiThread(() -> appendCamLog("Yayın hatası / bağlantı bekleniyor..."));
+                }
+            });
+
+            camMediaPlayer.play();
+        } catch (Exception e) {
+            appendCamLog("Hata: " + e.getMessage());
+        }
+    }
+
+    private void stopLiveCamStream() {
+        if (camMediaPlayer != null) {
+            try {
+                camMediaPlayer.stop();
+                if (camMediaPlayer.getVLCVout() != null) {
+                    camMediaPlayer.getVLCVout().detachViews();
+                }
+                camMediaPlayer.release();
+            } catch (Exception ignored) {}
+            camMediaPlayer = null;
+        }
+        if (camLibVLC != null) {
+            try {
+                camLibVLC.release();
+            } catch (Exception ignored) {}
+            camLibVLC = null;
+        }
+    }
+
+    private void appendCamLog(String msg) {
+        if (tvCamLogs == null) return;
+        String cur = tvCamLogs.getText().toString();
+        tvCamLogs.setText(cur + "\n" + msg);
     }
 
     // ---------- Vehicle page ----------

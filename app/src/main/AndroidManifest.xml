@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.SYSTEM_OVERLAY_WINDOW" />
     <!-- Required from API 33 to post the foreground-service notification, which is the
          only status UI the service has. Without it the notification is silently dropped. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -55,6 +57,11 @@
 
         <service
             android:name=".AbrpUploadService"
+            android:exported="false" />
+
+        <service
+            android:name=".ReverseOverlayService"
+            android:enabled="true"
             android:exported="false" />
 
         <!-- The head unit resumes far more often than it cold-boots, and announces the

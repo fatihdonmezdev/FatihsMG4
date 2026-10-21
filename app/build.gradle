@@ -159,6 +159,7 @@ dependencies {
     implementation libs.viewpager2
     implementation libs.security.crypto
     implementation 'com.google.zxing:core:3.5.3'
+    implementation 'org.videolan.android:libvlc-all:3.6.0'
     // android.jar's org.json is a stub in unit tests; the real implementation lets the
     // telemetry payload tests parse what the app actually builds.
     testImplementation libs.junit
