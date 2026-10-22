@@ -514,15 +514,7 @@ public class MainActivity extends AppCompatActivity {
 
             camMediaPlayer.setEventListener(event -> {
                 if (event.type == org.videolan.libvlc.MediaPlayer.Event.Playing) {
-                    runOnUiThread(() -> {
-                        appendCamLog("Yayın aktif! (" + url + ")");
-                        try {
-                            if (camMediaPlayer != null) camMediaPlayer.setRate(1.35f);
-                            camReconnectHandler.postDelayed(() -> {
-                                if (camMediaPlayer != null) camMediaPlayer.setRate(1.0f);
-                            }, 5000);
-                        } catch (Exception ignored) {}
-                    });
+                    runOnUiThread(() -> appendCamLog("Yayın aktif! (" + url + ")"));
                 } else if (event.type == org.videolan.libvlc.MediaPlayer.Event.EncounteredError ||
                            event.type == org.videolan.libvlc.MediaPlayer.Event.EndReached) {
                     runOnUiThread(() -> {

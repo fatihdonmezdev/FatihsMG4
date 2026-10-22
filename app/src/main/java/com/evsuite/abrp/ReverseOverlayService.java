@@ -55,7 +55,7 @@ public class ReverseOverlayService extends Service {
     private int reverseFalseCount = 0;
     private static final int DEBOUNCE_THRESHOLD = 5; // ~1.5s stability buffer to prevent focus flicker drops
 
-    private static final String RTSP_URL = "rtsp://192.168.0.1:554/livestream/12";
+    private static final String RTSP_URL = "rtsp://192.168.0.1:554/livestream/22";
 
     private BroadcastReceiver cameraReceiver;
 
@@ -164,14 +164,7 @@ public class ReverseOverlayService extends Service {
 
             // Reconnect listener if camera stream drops
             mediaPlayer.setEventListener(event -> {
-                if (event.type == MediaPlayer.Event.Playing) {
-                    try {
-                        mediaPlayer.setRate(1.35f);
-                        monitorHandler.postDelayed(() -> {
-                            if (mediaPlayer != null) mediaPlayer.setRate(1.0f);
-                        }, 5000);
-                    } catch (Exception ignored) {}
-                } else if (event.type == MediaPlayer.Event.EncounteredError || event.type == MediaPlayer.Event.EndReached) {
+                if (event.type == MediaPlayer.Event.EncounteredError || event.type == MediaPlayer.Event.EndReached) {
                     Log.w(TAG, "Stream koptu, 1 sn sonra otomatik yeniden bağlanılıyor...");
                     if (isOverlayShowing) {
                         monitorHandler.postDelayed(() -> {
