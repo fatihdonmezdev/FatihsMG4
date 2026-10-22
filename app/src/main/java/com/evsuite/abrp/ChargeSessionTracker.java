@@ -36,6 +36,8 @@ final class ChargeSessionTracker {
     private static final String PRICE = "price_per_kwh";
     private static final String PRICE_AC = "price_ac_per_kwh";
     private static final String PRICE_DC = "price_dc_per_kwh";
+    private static final String PREF_LAST_KNOWN_SOC = "last_known_soc";
+    private static final String PREF_LAST_KNOWN_SOC_TIME = "last_known_soc_time";
     private static final long END_GRACE_MS = 60_000L;
     private static final long CURVE_INTERVAL_MS = 60_000L;
     private static final int MAX_CURVE_POINTS = 720;
@@ -198,15 +200,43 @@ final class ChargeSessionTracker {
             }
             active.add(now, elapsed, soc, power, currentA, stationPower, status, context);
             persistActive();
+            if (soc != null && soc > 0f) {
+                saveLastKnownSoc(soc, now);
+            }
             return;
         }
 
-        if (active == null) return;
-        if (endCandidateMs == 0L) endCandidateMs = elapsed;
-        if (elapsed - endCandidateMs < END_GRACE_MS) return;
+        if (active == null) {
+            if (soc != null && soc > 0f) {
+                checkOfflineCharge(now, soc, speed);
+                saveLastKnownSoc(soc, now);
+            }
+            return;
+        }
 
+        boolean isMoving = speed != null && Math.abs(speed) > ConsumptionMath.SPEED_DEAD_BAND_KMH;
+        boolean longGap = (active.lastElapsedMs > 0L && (elapsed - active.lastElapsedMs > 120_000L || elapsed < active.lastElapsedMs));
+
+        if (endCandidateMs == 0L) endCandidateMs = elapsed;
+
+        if (!isMoving && !longGap && (elapsed - endCandidateMs < END_GRACE_MS)) {
+            return;
+        }
+
+        finalizeSessionInternal(now, soc);
+    }
+
+    synchronized boolean finalizeActiveIfEnded(long nowMs) {
+        if (active == null) return false;
+        finalizeSessionInternal(nowMs, active.lastSoc);
+        return true;
+    }
+
+    private void finalizeSessionInternal(long now, Float soc) {
+        if (active == null) return;
         double price = priceForType(active.chargingType);
-        active.finish(now, soc, price);
+        Float finalSoc = (soc != null && soc > 0f) ? soc : active.lastSoc;
+        active.finish(now, finalSoc, price);
         JSONObject completed = active.toJson();
         enqueue(completed);
 
@@ -217,8 +247,42 @@ final class ChargeSessionTracker {
                 .remove(ACTIVE)
                 .commit();
 
+        if (finalSoc != null && finalSoc > 0f) {
+            saveLastKnownSoc(finalSoc, now);
+        }
+
         active = null;
         endCandidateMs = 0L;
+    }
+
+    private void checkOfflineCharge(long now, float currentSoc, Float speed) {
+        if (speed != null && Math.abs(speed) > ConsumptionMath.SPEED_DEAD_BAND_KMH) return;
+        float lastSoc = prefs.getFloat(PREF_LAST_KNOWN_SOC, -1f);
+        long lastTime = prefs.getLong(PREF_LAST_KNOWN_SOC_TIME, 0L);
+        if (lastSoc > 0f && currentSoc >= lastSoc + 3.0f) {
+            float deltaSoc = currentSoc - lastSoc;
+            double energyKwh = (deltaSoc / 100.0) * BATTERY_USABLE_KWH;
+            double price = priceAcPerKwh();
+            long durationMs = Math.round((energyKwh / 6.6) * 3600_000.0);
+            long startTs = lastTime > 0 ? Math.min(lastTime, now - durationMs) : (now - durationMs);
+
+            Session synthetic = new Session(UUID.randomUUID().toString(), startTs, lastSoc, 6.6f, "AC", null, null);
+            synthetic.finish(now, currentSoc, price);
+            JSONObject completed = synthetic.toJson();
+            enqueue(completed);
+
+            prefs.edit()
+                    .putString(LAST, completed.toString())
+                    .putString(LAST_AC, completed.toString())
+                    .commit();
+        }
+    }
+
+    private void saveLastKnownSoc(float soc, long now) {
+        prefs.edit()
+                .putFloat(PREF_LAST_KNOWN_SOC, soc)
+                .putLong(PREF_LAST_KNOWN_SOC_TIME, now)
+                .apply();
     }
 
     synchronized Snapshot snapshot(String filterType) {
@@ -231,11 +295,30 @@ final class ChargeSessionTracker {
         if (session == null) {
             if ("AC".equalsIgnoreCase(filterType)) {
                 session = Session.fromJson(prefs.getString(LAST_AC, null));
+                if (session != null && !"AC".equalsIgnoreCase(session.chargingType)) {
+                    session = null;
+                }
+                if (session == null) {
+                    Session last = Session.fromJson(prefs.getString(LAST, null));
+                    if (last != null && "AC".equalsIgnoreCase(last.chargingType)) {
+                        session = last;
+                    }
+                }
             } else if ("DC".equalsIgnoreCase(filterType)) {
                 session = Session.fromJson(prefs.getString(LAST_DC, null));
-            }
-            if (session == null) {
+                if (session != null && !"DC".equalsIgnoreCase(session.chargingType)) {
+                    session = null;
+                }
+                if (session == null) {
+                    Session last = Session.fromJson(prefs.getString(LAST, null));
+                    if (last != null && "DC".equalsIgnoreCase(last.chargingType)) {
+                        session = last;
+                    }
+                }
+            } else {
                 session = Session.fromJson(prefs.getString(LAST, null));
+                if (session == null) session = Session.fromJson(prefs.getString(LAST_AC, null));
+                if (session == null) session = Session.fromJson(prefs.getString(LAST_DC, null));
             }
         }
 
@@ -355,7 +438,7 @@ final class ChargeSessionTracker {
         double pricePerKwh;
         double lossPercent = 10.0;
         long curveIntervalMs = CURVE_INTERVAL_MS;
-        private long lastElapsedMs;
+        long lastElapsedMs;
 
         Session(String id, long startedAtMs, Float startSoc, Float initialPowerKw,
                 String chargingType, Double latitude, Double longitude) {

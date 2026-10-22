@@ -111,12 +111,14 @@ public class MainActivity extends AppCompatActivity {
     private TextInputLayout consumptionSohLayout;
     private TextInputEditText consumptionSohInput;
     private java.time.LocalDate selectedConsumptionDate = java.time.LocalDate.now();
-    private TextView chargeStatus, chargeType, chargeSoc, chargeStartSoc, chargeVoltage, chargeCurrent, chargePower,
+    private TextView chargeStatus, chargeType, chargeSoc, chargeSocLabel, chargeStartSoc, chargeVoltage, chargeCurrent, chargePower,
             chargeEnergy, chargeGridEnergy, chargeDuration, chargeUnitPrice, chargeTotalCost, chargeLocation, chargeCurveTable;
     private TextView chargeBoxBatteryEnergy, chargeBoxBatterySub, chargeBoxGridEnergy, chargeBoxGridSub, chargeGridLabel;
     private MaterialButton chargeTabAc, chargeTabDc;
     private String chargingViewFilter = "AC";
     private EnergySnapshot lastEnergySnapshot;
+    private String lastRenderedSessionId = "";
+    private String lastRenderedFilter = "";
     private TextInputLayout chargePriceAcLayout, chargePriceDcLayout;
     private TextInputEditText chargePriceAcInput, chargePriceDcInput;
     private ChargeSessionTracker chargeSessionTracker;
@@ -672,6 +674,7 @@ public class MainActivity extends AppCompatActivity {
         chargeStatus = chargingPane.findViewById(R.id.charge_status);
         chargeType = chargingPane.findViewById(R.id.charge_type);
         chargeSoc = chargingPane.findViewById(R.id.charge_soc);
+        chargeSocLabel = chargingPane.findViewById(R.id.charge_soc_label);
         chargeStartSoc = chargingPane.findViewById(R.id.charge_start_soc);
         chargeVoltage = chargingPane.findViewById(R.id.charge_voltage);
         chargeCurrent = chargingPane.findViewById(R.id.charge_current);
@@ -759,6 +762,13 @@ public class MainActivity extends AppCompatActivity {
 
     private void refreshCharging(EnergySnapshot s) {
         if (chargeStatus == null) return;
+        if (s == null) {
+            s = lastEnergySnapshot;
+            if (s == null && vehicleReader != null) {
+                s = vehicleReader.read(System.currentTimeMillis());
+            }
+        }
+        if (s == null) return;
         lastEnergySnapshot = s;
         chargeSessionTracker.sample(s);
         Integer code = s.getChargingStatus();
@@ -793,18 +803,34 @@ public class MainActivity extends AppCompatActivity {
                 String.format(java.util.Locale.getDefault(), "%%%.1f kayıp dahil", session.lossPercent) : "Sapma / kayıp dahil";
 
         if (chargeBoxBatteryEnergy != null) chargeBoxBatteryEnergy.setText(energyStr);
-        if (chargeBoxBatterySub != null) chargeBoxBatterySub.setText(session.startedAtMs > 0 ? "Net batarya enerjisi" : "Net batarya enerjisi");
+        if (chargeBoxBatterySub != null) chargeBoxBatterySub.setText("Net batarya enerjisi");
         if (chargeBoxGridEnergy != null) chargeBoxGridEnergy.setText(gridEnergyStr);
         if (chargeBoxGridSub != null) chargeBoxGridSub.setText(lossStr);
 
         if (chargeType != null) {
             chargeType.setText(session.startedAtMs > 0 ? session.chargingType : (charging ? (dc ? "DC" : "AC") : chargingViewFilter));
         }
-        chargeSoc.setText(fmt(s.getSocPercent(), "%.1f %%"));
+
+        if (isActive) {
+            if (chargeSocLabel != null) chargeSocLabel.setText("Mevcut SOC");
+            chargeSoc.setText(fmt(s.getSocPercent(), "%.1f %%"));
+            chargeVoltage.setText(fmt(s.getBatteryVoltageV(), "%.1f V"));
+            chargeCurrent.setText(fmt(s.getBatteryCurrentA(), "%.1f A"));
+            chargePower.setText(s.getBatteryPowerKw() == null ? "—" : String.format(java.util.Locale.getDefault(), "%.1f kW", Math.abs(s.getBatteryPowerKw())));
+        } else {
+            if (chargeSocLabel != null) chargeSocLabel.setText("Bitiş SOC");
+            chargeSoc.setText(session.startedAtMs > 0 && session.currentSocPercent != null ? fmt(session.currentSocPercent, "%.1f %%") : "—");
+            chargeVoltage.setText("—");
+            chargeCurrent.setText("—");
+            if (session.startedAtMs > 0 && session.durationSeconds > 0 && session.energyKwh > 0) {
+                double avgKw = session.energyKwh / (session.durationSeconds / 3600.0);
+                chargePower.setText(String.format(java.util.Locale.getDefault(), "%.1f kW (ort.)", avgKw));
+            } else {
+                chargePower.setText("—");
+            }
+        }
+
         chargeStartSoc.setText(fmt(session.startSocPercent, "%.1f %%"));
-        chargeVoltage.setText(fmt(s.getBatteryVoltageV(), "%.1f V"));
-        chargeCurrent.setText(fmt(s.getBatteryCurrentA(), "%.1f A"));
-        chargePower.setText(s.getBatteryPowerKw() == null ? "—" : String.format(java.util.Locale.getDefault(), "%.1f kW", Math.abs(s.getBatteryPowerKw())));
         chargeEnergy.setText(energyStr);
         chargeGridEnergy.setText(gridEnergyStr);
         if (chargeGridLabel != null) {
@@ -831,8 +857,14 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
-        chargeGraph.setPoints(session.points);
-        chargeCurveTable.setText(chargeGraph.tableText());
+
+        String currentSessionKey = session.startedAtMs + "_" + session.points.size();
+        if (!currentSessionKey.equals(lastRenderedSessionId) || !chargingViewFilter.equals(lastRenderedFilter)) {
+            lastRenderedSessionId = currentSessionKey;
+            lastRenderedFilter = chargingViewFilter;
+            chargeGraph.setPoints(session.points);
+            chargeCurveTable.setText(chargeGraph.tableText());
+        }
     }
 
     private void refreshConsumption() {
@@ -956,8 +988,8 @@ public class MainActivity extends AppCompatActivity {
     // ---------- Call log ----------
 
     /**
-     * "Şimdi yükle" button — forces a cache drain + fresh chunk on a background thread,
-     * ignoring the 2-minute throttle. The result lands in the upload log (Kayıtlar tab).
+     * "Şimdi yükle" button — forces a cache drain + fresh chunk + pending charges on a background thread,
+     * ignoring throttles. The result lands in the upload log (Kayıtlar tab).
      */
     private void manualFlush() {
         if (consumptionCloudClient == null || consumptionTracker == null) return;
@@ -965,23 +997,29 @@ public class MainActivity extends AppCompatActivity {
                 System.currentTimeMillis(), 0, true, "Manuel sync başlatıldı…"));
         new Thread(() -> {
             String result = consumptionCloudClient.flushNow(
-                    consumptionTracker, System.currentTimeMillis());
-            runOnUiThread(() -> Toast.makeText(this, result, Toast.LENGTH_SHORT).show());
+                    consumptionTracker, chargeSessionTracker, System.currentTimeMillis());
+            runOnUiThread(() -> {
+                Toast.makeText(this, result, Toast.LENGTH_SHORT).show();
+                if (lastEnergySnapshot != null) refreshCharging(lastEnergySnapshot);
+                refreshConsumption();
+            });
         }, "manual-flush").start();
     }
 
     /**
-     * Tüketim sekmesi "Yenile" button — sends cached chunks + fresh delta, invalidates the
-     * history cache so the next poll fetches fresh data from the cloud, then refreshes the UI.
+     * Tüketim sekmesi "Yenile" button — sends cached chunks + fresh delta + pending charges,
+     * invalidates the history cache so the next poll fetches fresh data from the cloud, then refreshes the UI.
      */
     private void refreshFromCloud() {
         if (consumptionCloudClient == null || consumptionTracker == null) return;
         AbrpUploadService.log().record(new UploadLog.Entry(
                 System.currentTimeMillis(), 0, true, "Tüketim yenileniyor…"));
         new Thread(() -> {
-            consumptionCloudClient.flushNow(consumptionTracker, System.currentTimeMillis());
+            consumptionCloudClient.flushNow(
+                    consumptionTracker, chargeSessionTracker, System.currentTimeMillis());
             consumptionCloudClient.invalidateHistory();
             runOnUiThread(() -> {
+                if (lastEnergySnapshot != null) refreshCharging(lastEnergySnapshot);
                 refreshConsumption();
                 Toast.makeText(this, "Tüketim yenilendi", Toast.LENGTH_SHORT).show();
             });

@@ -30,7 +30,7 @@ import java.util.List;
 final class ConsumptionCloudClient {
     private static final String TAG = "FatihsMG4.Mongo";
     private static final long CONSUMPTION_SYNC_INTERVAL_MS = 2 * 60_000L;
-    private static final long CHARGE_RETRY_INTERVAL_MS = 5 * 60_000L;
+    private static final long CHARGE_RETRY_INTERVAL_MS = 60_000L;
     private static final long HISTORY_FETCH_INTERVAL_MS = 5 * 60_000L;
     private static final int TIMEOUT_MS = 8_000;
     private static final String PREFS = "consumption_cloud";
@@ -219,6 +219,9 @@ final class ConsumptionCloudClient {
         lastChargeAttemptMs = elapsed;
         try {
             syncPendingCharges(charges, pending);
+            if (charges.pendingUploads().isEmpty()) {
+                lastAttemptedChargeId = "";
+            }
         } catch (Exception e) {
             logEvent(false, 0, "Şarj session sync hatası: " + e.getMessage());
             Log.w(TAG, "Charging-session sync unavailable: " + e.getMessage());
@@ -324,20 +327,38 @@ final class ConsumptionCloudClient {
     }
 
     /**
-     * Immediately attempts to send every cached chunk and take a fresh one, ignoring the
-     * 2-minute throttle. Called from the UI "Şimdi yükle" button. Returns a one-line
-     * status for the log.
+     * Immediately attempts to send pending charges and consumption chunks, ignoring throttles.
+     * Called from the UI "Şimdi yükle" button.
      */
-    String flushNow(ConsumptionTracker tracker, long nowMs) {
+    String flushNow(ConsumptionTracker tracker, ChargeSessionTracker charges, long nowMs) {
         if (endpoint.isEmpty() || token.isEmpty()) return "API yapılandırılmamış";
+
+        int chargesUploaded = 0;
+        int chargesPending = 0;
+        if (charges != null) {
+            try {
+                charges.finalizeActiveIfEnded(nowMs);
+                List<JSONObject> pendingCharges = charges.pendingUploads();
+                if (!pendingCharges.isEmpty()) {
+                    Log.i(TAG, "flushNow: uploading " + pendingCharges.size() + " charge sessions");
+                    syncPendingCharges(charges, pendingCharges);
+                    chargesUploaded = pendingCharges.size() - charges.pendingUploads().size();
+                    chargesPending = charges.pendingUploads().size();
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "flushNow charge sync failed: " + e.getMessage());
+                chargesPending = charges.pendingUploads().size();
+            }
+        }
+
         int cached = drainChunkCache();
-        ConsumptionTracker.CloudSnapshot chunk = tracker.takeChunkDelta();
-        int total = cached;
+        ConsumptionTracker.CloudSnapshot chunk = tracker != null ? tracker.takeChunkDelta() : null;
+        int chunksUploaded = cached;
         if (chunk != null) {
             try {
                 JSONObject body = consumptionBody(chunk, nowMs);
                 if (send("/v1/consumption/daily", "PUT", body)) {
-                    total++;
+                    chunksUploaded++;
                     invalidateHistory();
                 } else {
                     cacheChunk(body);
@@ -346,12 +367,44 @@ final class ConsumptionCloudClient {
                 try { cacheChunk(consumptionBody(chunk, nowMs)); } catch (Exception ignored) { }
             }
         }
-        int pending = pendingChunkCount();
-        String msg = total > 0
-                ? total + " chunk yüklendi" + (pending > 0 ? ", " + pending + " hâlâ bekliyor" : "")
-                : (pending > 0 ? pending + " chunk yüklenemedi (internet?)" : "Yüklenecek yeni veri yok");
-        logEvent(total > 0, total > 0 ? 200 : 0, "Manuel sync: " + msg);
+        int chunksPending = pendingChunkCount();
+
+        StringBuilder sb = new StringBuilder();
+        if (chunksUploaded > 0 || chargesUploaded > 0) {
+            if (chunksUploaded > 0) sb.append(chunksUploaded).append(" chunk");
+            if (chargesUploaded > 0) {
+                if (chunksUploaded > 0) sb.append(", ");
+                sb.append(chargesUploaded).append(" şarj oturumu");
+            }
+            sb.append(" yüklendi");
+            if (chunksPending > 0 || chargesPending > 0) {
+                sb.append(" (");
+                if (chunksPending > 0) sb.append(chunksPending).append(" chunk");
+                if (chargesPending > 0) {
+                    if (chunksPending > 0) sb.append(", ");
+                    sb.append(chargesPending).append(" şarj");
+                }
+                sb.append(" bekliyor)");
+            }
+        } else if (chunksPending > 0 || chargesPending > 0) {
+            sb.append("Yüklenemedi (internet?) — ");
+            if (chunksPending > 0) sb.append(chunksPending).append(" chunk");
+            if (chargesPending > 0) {
+                if (chunksPending > 0) sb.append(", ");
+                sb.append(chargesPending).append(" şarj");
+            }
+            sb.append(" bekliyor");
+        } else {
+            sb.append("Yüklenecek yeni veri yok");
+        }
+
+        String msg = sb.toString();
+        logEvent(chunksUploaded > 0 || chargesUploaded > 0, (chunksUploaded > 0 || chargesUploaded > 0) ? 200 : 0, "Manuel sync: " + msg);
         return msg;
+    }
+
+    String flushNow(ConsumptionTracker tracker, long nowMs) {
+        return flushNow(tracker, null, nowMs);
     }
 
     private List<DayRecord> fetchHistory() throws Exception {
