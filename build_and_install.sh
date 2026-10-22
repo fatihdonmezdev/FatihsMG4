@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-BUILD_TOOLS="/opt/homebrew/share/android-commandlinetools/build-tools/36.0.0"
+BUILD_TOOLS="/opt/homebrew/share/android-commandlinetools/build-tools/35.0.0"
 ZIPALIGN="$BUILD_TOOLS/zipalign"
 APKSIGNER="$BUILD_TOOLS/apksigner"
 KEYS="$ROOT/tools"

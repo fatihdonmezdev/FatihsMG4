@@ -62,7 +62,7 @@
         <service
             android:name=".ReverseOverlayService"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="true" />
 
         <!-- The head unit resumes far more often than it cold-boots, and announces the
              resume with QUICKBOOT_POWERON. Listening only for BOOT_COMPLETED is why

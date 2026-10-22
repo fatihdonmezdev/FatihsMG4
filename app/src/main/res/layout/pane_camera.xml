@@ -62,22 +62,11 @@
             android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_cam_front"
-                style="@style/Widget.EV.Button.Outlined"
-                android:layout_width="0dp"
-                android:layout_height="64dp"
-                android:layout_weight="1"
-                android:text="Ön Kamera"
-                android:textSize="14sp" />
-
-            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_cam_rear"
                 style="@style/Widget.EV.Button"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="64dp"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:text="Arka Kamera"
+                android:text="Kamera Yayını (Yeniden Bağlan)"
                 android:textSize="14sp" />
         </LinearLayout>
 

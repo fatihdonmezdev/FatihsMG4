@@ -78,13 +78,22 @@ public class MainActivity extends AppCompatActivity {
     // Camera Page components
     private SurfaceView camSurface;
     private TextView tvCamStatus, tvCamLogs, tvCamTitleOverlay;
-    private MaterialButton btnCamFront, btnCamRear;
+    private MaterialButton btnCamRear;
     private SwitchMaterial cameraReverseSwitch;
     private org.videolan.libvlc.LibVLC camLibVLC;
     private org.videolan.libvlc.MediaPlayer camMediaPlayer;
-    private String currentCamUrl = "rtsp://192.168.0.1:554/livestream/22";
-    private static final String FRONT_RTSP_URL = "rtsp://192.168.0.1:554/livestream/12";
-    private static final String REAR_RTSP_URL = "rtsp://192.168.0.1:554/livestream/22";
+    private static final String DEFAULT_RTSP_URL = "rtsp://192.168.0.1:554/livestream/12";
+    private String currentCamUrl = DEFAULT_RTSP_URL;
+    private int currentSelectedPage = 0;
+    private final android.os.Handler camReconnectHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable camReconnectRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (currentSelectedPage == 5) { // 5 is R.id.tabCamera
+                startLiveCamStream(currentCamUrl);
+            }
+        }
+    };
 
     /** Wi-Fi page. The helper is the same one the upload service uses on its own tick. */
     private WifiAutoConnect wifi;
@@ -185,11 +194,20 @@ public class MainActivity extends AppCompatActivity {
      * also serves TalkBack, which announces the current destination.
      */
     private void markCurrentPage(int position) {
+        currentSelectedPage = position;
         for (int i = 0; i < TAB_IDS.length; i++) {
             findViewById(TAB_IDS[i]).setSelected(i == position);
         }
         ((TextView) findViewById(R.id.header_title)).setText(PAGE_TITLES[position]);
         ((TextView) findViewById(R.id.header_subtitle)).setText(PAGE_SUBTITLES[position]);
+
+        if (position == 5) {
+            // Started/resumed Camera tab
+            startLiveCamStream(currentCamUrl);
+        } else {
+            // Leaving Camera tab: stop to save CPU and network
+            stopLiveCamStream();
+        }
     }
 
     /** Refreshes state + call log while the screen is visible. */
@@ -415,7 +433,6 @@ public class MainActivity extends AppCompatActivity {
         tvCamStatus = cameraPane.findViewById(R.id.tv_cam_status);
         tvCamLogs = cameraPane.findViewById(R.id.tv_cam_logs);
         tvCamTitleOverlay = cameraPane.findViewById(R.id.tv_cam_title_overlay);
-        btnCamFront = cameraPane.findViewById(R.id.btn_cam_front);
         btnCamRear = cameraPane.findViewById(R.id.btn_cam_rear);
         cameraReverseSwitch = cameraPane.findViewById(R.id.camera_reverse_switch);
 
@@ -426,15 +443,16 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, checked ? "Geri vites kamerası aktif edildi" : "Geri vites kamerası kapatıldı", Toast.LENGTH_SHORT).show();
         });
 
-        btnCamFront.setOnClickListener(v -> switchLiveCamera(FRONT_RTSP_URL, "Ön Kamera"));
-        btnCamRear.setOnClickListener(v -> switchLiveCamera(REAR_RTSP_URL, "Arka Kamera"));
+        btnCamRear.setOnClickListener(v -> switchLiveCamera(DEFAULT_RTSP_URL, "Kamera Yayını"));
 
         // Keep SurfaceView ready
         camSurface.getHolder().addCallback(new android.view.SurfaceHolder.Callback() {
             @Override
             public void surfaceCreated(android.view.SurfaceHolder holder) {
                 // If on Camera page, start stream
-                startLiveCamStream(currentCamUrl);
+                if (currentSelectedPage == 5) {
+                    startLiveCamStream(currentCamUrl);
+                }
             }
 
             @Override
@@ -448,6 +466,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void switchLiveCamera(String url, String label) {
+        camReconnectHandler.removeCallbacks(camReconnectRunnable);
         currentCamUrl = url;
         if (tvCamStatus != null) tvCamStatus.setText("Seçilen: " + label);
         if (tvCamTitleOverlay != null) tvCamTitleOverlay.setText("70mai: " + label);
@@ -461,14 +480,13 @@ public class MainActivity extends AppCompatActivity {
 
             ArrayList<String> options = new ArrayList<>();
             options.add("--rtsp-tcp");
-            options.add("--network-caching=600");
-            options.add("--live-caching=600");
+            options.add("--network-caching=150");
             options.add("--no-audio");
             options.add("--clock-jitter=0");
-            options.add("--clock-synchro=0");
             options.add("--drop-late-frames");
             options.add("--skip-frames");
             options.add("--avcodec-hurry-up");
+            options.add("--avcodec-hw=none");
 
             camLibVLC = new org.videolan.libvlc.LibVLC(this, options);
             camMediaPlayer = new org.videolan.libvlc.MediaPlayer(camLibVLC);
@@ -482,33 +500,49 @@ public class MainActivity extends AppCompatActivity {
             camMediaPlayer.setScale(0f);
 
             org.videolan.libvlc.Media media = new org.videolan.libvlc.Media(camLibVLC, Uri.parse(url));
-            media.setHWDecoderEnabled(true, false);
-            media.addOption(":network-caching=600");
-            media.addOption(":live-caching=600");
+            media.setHWDecoderEnabled(false, false);
             media.addOption(":rtsp-tcp");
+            media.addOption(":network-caching=150");
             media.addOption(":clock-jitter=0");
-            media.addOption(":clock-synchro=0");
             media.addOption(":drop-late-frames");
             media.addOption(":skip-frames");
+            media.addOption(":avcodec-hurry-up");
+            media.addOption(":avcodec-hw=none");
 
             camMediaPlayer.setMedia(media);
             media.release();
 
             camMediaPlayer.setEventListener(event -> {
                 if (event.type == org.videolan.libvlc.MediaPlayer.Event.Playing) {
-                    runOnUiThread(() -> appendCamLog("Yayın aktif! (" + url + ")"));
-                } else if (event.type == org.videolan.libvlc.MediaPlayer.Event.EncounteredError) {
-                    runOnUiThread(() -> appendCamLog("Yayın hatası / bağlantı bekleniyor..."));
+                    runOnUiThread(() -> {
+                        appendCamLog("Yayın aktif! (" + url + ")");
+                        try {
+                            if (camMediaPlayer != null) camMediaPlayer.setRate(1.35f);
+                            camReconnectHandler.postDelayed(() -> {
+                                if (camMediaPlayer != null) camMediaPlayer.setRate(1.0f);
+                            }, 5000);
+                        } catch (Exception ignored) {}
+                    });
+                } else if (event.type == org.videolan.libvlc.MediaPlayer.Event.EncounteredError ||
+                           event.type == org.videolan.libvlc.MediaPlayer.Event.EndReached) {
+                    runOnUiThread(() -> {
+                        appendCamLog("Yayın kesildi, 1 sn sonra yeniden bağlanılıyor...");
+                        camReconnectHandler.removeCallbacks(camReconnectRunnable);
+                        camReconnectHandler.postDelayed(camReconnectRunnable, 1000);
+                    });
                 }
             });
 
             camMediaPlayer.play();
         } catch (Exception e) {
             appendCamLog("Hata: " + e.getMessage());
+            camReconnectHandler.removeCallbacks(camReconnectRunnable);
+            camReconnectHandler.postDelayed(camReconnectRunnable, 1000);
         }
     }
 
     private void stopLiveCamStream() {
+        camReconnectHandler.removeCallbacks(camReconnectRunnable);
         if (camMediaPlayer != null) {
             try {
                 camMediaPlayer.stop();

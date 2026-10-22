@@ -4,8 +4,10 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.PixelFormat;
 import android.net.Uri;
@@ -53,7 +55,9 @@ public class ReverseOverlayService extends Service {
     private int reverseFalseCount = 0;
     private static final int DEBOUNCE_THRESHOLD = 5; // ~1.5s stability buffer to prevent focus flicker drops
 
-    private static final String RTSP_URL = "rtsp://192.168.0.1:554/livestream/22";
+    private static final String RTSP_URL = "rtsp://192.168.0.1:554/livestream/12";
+
+    private BroadcastReceiver cameraReceiver;
 
     @Override
     public void onCreate() {
@@ -67,70 +71,33 @@ public class ReverseOverlayService extends Service {
         startForeground(NOTIF_ID, notification);
 
         windowManager = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
-        startGearMonitoring();
+        registerCameraReceiver();
     }
 
-    private void startGearMonitoring() {
-        monitorHandler = new Handler(Looper.getMainLooper());
-        monitorRunnable = new Runnable() {
+    private void registerCameraReceiver() {
+        cameraReceiver = new BroadcastReceiver() {
             @Override
-            public void run() {
+            public void onReceive(Context context, Intent intent) {
+                if (intent == null || intent.getAction() == null) return;
                 SharedPreferences prefs = getSharedPreferences("abrp_prefs", MODE_PRIVATE);
                 boolean enabled = prefs.getBoolean(PREF_REVERSE_CAM_ENABLED, true);
+                if (!enabled) return;
 
-                if (!enabled) {
-                    if (isOverlayShowing) {
-                        hideOverlay();
-                        lastWasReverse = false;
-                    }
-                    monitorHandler.postDelayed(this, 1000);
-                    return;
+                String action = intent.getAction();
+                if ("com.saicmotor.360camera.show".equals(action)) {
+                    Log.i(TAG, "Geri vites sinyali alındı (360camera.show) -> Overlay anında açılıyor");
+                    showOverlay();
+                } else if ("com.saicmotor.360camera.close".equals(action)) {
+                    Log.i(TAG, "Geri vitesten çıkış sinyali alındı (360camera.close) -> Overlay anında kapatılıyor");
+                    hideOverlay();
                 }
-
-                boolean inReverse = checkIsReverse();
-                if (inReverse) {
-                    reverseFalseCount = 0;
-                    if (!lastWasReverse) {
-                        lastWasReverse = true;
-                        Log.i(TAG, "Geri vites algılandı -> Overlay ve LibVLC başlatılıyor");
-                        showOverlay();
-                    }
-                } else {
-                    if (lastWasReverse) {
-                        reverseFalseCount++;
-                        if (reverseFalseCount >= DEBOUNCE_THRESHOLD) {
-                            lastWasReverse = false;
-                            reverseFalseCount = 0;
-                            Log.i(TAG, "Geri vitesten çıkıldı (onaylandı) -> Overlay kapatılıyor");
-                            hideOverlay();
-                        }
-                    }
-                }
-                monitorHandler.postDelayed(this, 300);
             }
         };
-        monitorHandler.post(monitorRunnable);
-    }
 
-    private boolean checkIsReverse() {
-        try {
-            Class<?> sp = Class.forName("android.os.SystemProperties");
-            String gear = (String) sp.getMethod("get", String.class, String.class)
-                    .invoke(null, "arcsoft.avm.mCurCarGear", "0");
-            if ("2".equals(gear)) {
-                return true;
-            }
-
-            // Fallback: check window focus and active window records for SAIC EVS (radar screen)
-            Process p = Runtime.getRuntime().exec(new String[]{"sh", "-c", "dumpsys window | grep -iE 'mCurrentFocus|mFocusedApp' | grep -q 'com.saicmotor.evs'"});
-            int exitCode = p.waitFor();
-            if (exitCode == 0) {
-                return true;
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "checkIsReverse error: " + t.getMessage());
-        }
-        return false;
+        IntentFilter filter = new IntentFilter();
+        filter.addAction("com.saicmotor.360camera.show");
+        filter.addAction("com.saicmotor.360camera.close");
+        registerReceiver(cameraReceiver, filter);
     }
 
     private void showOverlay() {
@@ -173,14 +140,13 @@ public class ReverseOverlayService extends Service {
             stopVlcStream();
             ArrayList<String> options = new ArrayList<>();
             options.add("--rtsp-tcp");
-            options.add("--network-caching=600");
-            options.add("--live-caching=600");
+            options.add("--network-caching=150");
             options.add("--no-audio");
             options.add("--clock-jitter=0");
-            options.add("--clock-synchro=0");
             options.add("--drop-late-frames");
             options.add("--skip-frames");
             options.add("--avcodec-hurry-up");
+            options.add("--avcodec-hw=none");
 
             libVLC = new LibVLC(this, options);
             mediaPlayer = new MediaPlayer(libVLC);
@@ -198,25 +164,32 @@ public class ReverseOverlayService extends Service {
 
             // Reconnect listener if camera stream drops
             mediaPlayer.setEventListener(event -> {
-                if (event.type == MediaPlayer.Event.EncounteredError || event.type == MediaPlayer.Event.EndReached) {
-                    Log.w(TAG, "Stream koptu, otomatik yeniden bağlanılıyor...");
+                if (event.type == MediaPlayer.Event.Playing) {
+                    try {
+                        mediaPlayer.setRate(1.35f);
+                        monitorHandler.postDelayed(() -> {
+                            if (mediaPlayer != null) mediaPlayer.setRate(1.0f);
+                        }, 5000);
+                    } catch (Exception ignored) {}
+                } else if (event.type == MediaPlayer.Event.EncounteredError || event.type == MediaPlayer.Event.EndReached) {
+                    Log.w(TAG, "Stream koptu, 1 sn sonra otomatik yeniden bağlanılıyor...");
                     if (isOverlayShowing) {
                         monitorHandler.postDelayed(() -> {
                             if (isOverlayShowing) startVlcStream();
-                        }, 500);
+                        }, 1000);
                     }
                 }
             });
 
             Media media = new Media(libVLC, Uri.parse(RTSP_URL));
-            media.setHWDecoderEnabled(true, false);
-            media.addOption(":network-caching=600");
-            media.addOption(":live-caching=600");
+            media.setHWDecoderEnabled(false, false);
             media.addOption(":rtsp-tcp");
+            media.addOption(":network-caching=150");
             media.addOption(":clock-jitter=0");
-            media.addOption(":clock-synchro=0");
             media.addOption(":drop-late-frames");
             media.addOption(":skip-frames");
+            media.addOption(":avcodec-hurry-up");
+            media.addOption(":avcodec-hw=none");
 
             mediaPlayer.setMedia(media);
             media.release();
@@ -265,6 +238,12 @@ public class ReverseOverlayService extends Service {
 
     @Override
     public void onDestroy() {
+        if (cameraReceiver != null) {
+            try {
+                unregisterReceiver(cameraReceiver);
+            } catch (Exception ignored) {}
+            cameraReceiver = null;
+        }
         if (monitorHandler != null && monitorRunnable != null) {
             monitorHandler.removeCallbacks(monitorRunnable);
         }
