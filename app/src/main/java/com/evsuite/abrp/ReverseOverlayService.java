@@ -41,6 +41,8 @@ public class ReverseOverlayService extends Service {
     private static final String CHANNEL_ID = "maistream_reverse_channel";
     private static final int NOTIF_ID = 202;
     public static final String PREF_REVERSE_CAM_ENABLED = "reverse_cam_enabled";
+    public static final String PREF_CAM_RTSP_URL = "cam_rtsp_url";
+    public static final String DEFAULT_RTSP_URL = "rtsp://192.168.0.1:554/livestream/22";
 
     private WindowManager windowManager;
     private View overlayView;
@@ -174,7 +176,11 @@ public class ReverseOverlayService extends Service {
                 }
             });
 
-            Media media = new Media(libVLC, Uri.parse(RTSP_URL));
+            SharedPreferences prefs = getSharedPreferences("abrp_prefs", MODE_PRIVATE);
+            String rtspUrl = prefs.getString(PREF_CAM_RTSP_URL, DEFAULT_RTSP_URL);
+            Log.i(TAG, "Starting overlay stream: " + rtspUrl);
+
+            Media media = new Media(libVLC, Uri.parse(rtspUrl));
             media.setHWDecoderEnabled(false, false);
             media.addOption(":rtsp-tcp");
             media.addOption(":network-caching=150");

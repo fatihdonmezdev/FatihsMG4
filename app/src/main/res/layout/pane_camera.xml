@@ -9,10 +9,10 @@
 
     <!-- Sol Kontrol Paneli -->
     <LinearLayout
-        android:layout_width="380dp"
+        android:layout_width="440dp"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="24dp"
+        android:padding="20dp"
         android:background="@drawable/bg_glass">
 
         <TextView
@@ -25,74 +25,91 @@
             android:id="@+id/camera_reverse_switch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="72dp"
+            android:minHeight="56dp"
             android:text="Geri viteste otomatik göster"
             android:textAppearance="@style/Text.EV.Body"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
             app:useMaterialThemeColors="true"
             app:thumbTint="@color/switch_thumb"
             app:trackTint="@color/switch_track"
             android:textColor="@color/ev_text_primary" />
 
+        <!-- RTSP Stream URL Input & Save -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Geri vitese takıldığında sağ %65 alanda radarın üstünde otomatik açılır."
-            android:textAppearance="@style/Text.EV.Secondary" />
+            android:layout_marginTop="8dp"
+            android:text="RTSP STREAM URL:"
+            android:textAppearance="@style/Text.EV.Eyebrow"
+            android:textSize="11sp" />
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#20FFFFFF"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="20dp" />
-
-        <TextView
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/layout_rtsp_url"
+            style="@style/Widget.EV.Input"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="CANLI ÖNİZLEME"
-            android:textAppearance="@style/Text.EV.Eyebrow" />
+            android:layout_marginTop="4dp">
 
-        <!-- Kamera Seçim Butonları -->
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_rtsp_url"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="52dp"
+                android:hint="rtsp://192.168.0.1:554/livestream/22"
+                android:singleLine="true"
+                android:textSize="13sp" />
+        </com.google.android.material.textfield.TextInputLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
             android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_cam_rear"
+                android:id="@+id/btn_save_rtsp_url"
                 style="@style/Widget.EV.Button"
-                android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:text="Kamera Yayını (Yeniden Bağlan)"
-                android:textSize="14sp" />
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:text="Kaydet &amp; Bağlan"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_reset_rtsp_url"
+                style="@style/Widget.EV.Button.Outlined"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:layout_marginStart="8dp"
+                android:text="Varsayılan"
+                android:textSize="12sp" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/tv_cam_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="12dp"
             android:text="Hazır"
-            android:textAppearance="@style/Text.EV.Secondary" />
+            android:textAppearance="@style/Text.EV.Secondary"
+            android:textSize="12sp" />
 
         <TextView
             android:id="@+id/tv_cam_logs"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="12dp"
             android:background="@drawable/bg_input_panel"
-            android:padding="12dp"
-            android:text="Kamera sistemi hazır.\nWi-Fi: 70mai_A410_1d59\n"
+            android:padding="10dp"
+            android:text="Kamera sistemi hazır.\n"
             android:textColor="#A1A1AA"
             android:textSize="11sp" />
     </LinearLayout>
 
     <Space
-        android:layout_width="20dp"
+        android:layout_width="16dp"
         android:layout_height="1dp" />
 
     <!-- Sağ Canlı Video Ekranı -->

@@ -76,12 +76,12 @@ public class MainActivity extends AppCompatActivity {
     // Camera Page components
     private SurfaceView camSurface;
     private TextView tvCamStatus, tvCamLogs, tvCamTitleOverlay;
-    private MaterialButton btnCamRear;
+    private TextInputEditText etRtspUrl;
+    private MaterialButton btnSaveRtspUrl, btnResetRtspUrl;
     private SwitchMaterial cameraReverseSwitch;
     private org.videolan.libvlc.LibVLC camLibVLC;
     private org.videolan.libvlc.MediaPlayer camMediaPlayer;
-    private static final String DEFAULT_RTSP_URL = "rtsp://192.168.0.1:554/livestream/12";
-    private String currentCamUrl = DEFAULT_RTSP_URL;
+    private String currentCamUrl = ReverseOverlayService.DEFAULT_RTSP_URL;
     private int currentSelectedPage = 0;
     private final android.os.Handler camReconnectHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private final Runnable camReconnectRunnable = new Runnable() {
@@ -429,8 +429,16 @@ public class MainActivity extends AppCompatActivity {
         tvCamStatus = cameraPane.findViewById(R.id.tv_cam_status);
         tvCamLogs = cameraPane.findViewById(R.id.tv_cam_logs);
         tvCamTitleOverlay = cameraPane.findViewById(R.id.tv_cam_title_overlay);
-        btnCamRear = cameraPane.findViewById(R.id.btn_cam_rear);
+        etRtspUrl = cameraPane.findViewById(R.id.et_rtsp_url);
+        btnSaveRtspUrl = cameraPane.findViewById(R.id.btn_save_rtsp_url);
+        btnResetRtspUrl = cameraPane.findViewById(R.id.btn_reset_rtsp_url);
         cameraReverseSwitch = cameraPane.findViewById(R.id.camera_reverse_switch);
+
+        // Load saved RTSP URL
+        currentCamUrl = prefs.getString(ReverseOverlayService.PREF_CAM_RTSP_URL, ReverseOverlayService.DEFAULT_RTSP_URL);
+        if (etRtspUrl != null) {
+            etRtspUrl.setText(currentCamUrl);
+        }
 
         boolean revEnabled = prefs.getBoolean(ReverseOverlayService.PREF_REVERSE_CAM_ENABLED, true);
         cameraReverseSwitch.setChecked(revEnabled);
@@ -439,14 +447,37 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, checked ? "Geri vites kamerası aktif edildi" : "Geri vites kamerası kapatıldı", Toast.LENGTH_SHORT).show();
         });
 
-        btnCamRear.setOnClickListener(v -> switchLiveCamera(DEFAULT_RTSP_URL, "Kamera Yayını"));
+        if (btnSaveRtspUrl != null) {
+            btnSaveRtspUrl.setOnClickListener(v -> {
+                String newUrl = textOf(etRtspUrl);
+                if (newUrl.isEmpty()) {
+                    Toast.makeText(this, "Geçerli bir RTSP URL girin", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                prefs.edit().putString(ReverseOverlayService.PREF_CAM_RTSP_URL, newUrl).apply();
+                currentCamUrl = newUrl;
+                Toast.makeText(this, "Kamera URL kaydedildi!", Toast.LENGTH_SHORT).show();
+                switchLiveCamera(newUrl, "Özel Akış");
+            });
+        }
+
+        if (btnResetRtspUrl != null) {
+            btnResetRtspUrl.setOnClickListener(v -> {
+                String defUrl = ReverseOverlayService.DEFAULT_RTSP_URL;
+                prefs.edit().putString(ReverseOverlayService.PREF_CAM_RTSP_URL, defUrl).apply();
+                currentCamUrl = defUrl;
+                if (etRtspUrl != null) etRtspUrl.setText(defUrl);
+                Toast.makeText(this, "Varsayılan URL ayarlandı", Toast.LENGTH_SHORT).show();
+                switchLiveCamera(defUrl, "Varsayılan Kamera");
+            });
+        }
 
         // Keep SurfaceView ready
         camSurface.getHolder().addCallback(new android.view.SurfaceHolder.Callback() {
             @Override
             public void surfaceCreated(android.view.SurfaceHolder holder) {
                 // If on Camera page, start stream
-                if (currentSelectedPage == 5) {
+                if (currentSelectedPage == 4) {
                     startLiveCamStream(currentCamUrl);
                 }
             }
