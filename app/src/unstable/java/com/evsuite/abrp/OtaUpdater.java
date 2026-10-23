@@ -223,6 +223,8 @@ final class OtaUpdater {
     /** Scan every asset of every pre-release; asset ordering does not imply version order. */
     static Update selectUpdate(JSONArray releases, String currentVersion) throws JSONException {
         Update best = null;
+        String requiredPrefix = BuildConfig.APK_PREFIX.toLowerCase(Locale.US);
+
         for (int i = 0; i < releases.length(); i++) {
             JSONObject release = releases.getJSONObject(i);
             if (!release.optBoolean("prerelease", false) || release.optBoolean("draft", false)) continue;
@@ -231,7 +233,11 @@ final class OtaUpdater {
             for (int a = 0; a < assets.length(); a++) {
                 JSONObject asset = assets.getJSONObject(a);
                 String name = asset.optString("name", "");
-                if (!name.toLowerCase(Locale.US).contains("unstable")) continue;
+                String nameLower = name.toLowerCase(Locale.US);
+                if (!nameLower.contains("unstable")) continue;
+                // Channel check: Fatih only accepts FatihsMG4, Sami only accepts SamisMG4
+                if (!nameLower.startsWith(requiredPrefix)) continue;
+
                 String version = versionFromAssetName(name);
                 if (version == null || !isNewer(version, currentVersion)) continue;
                 if (best != null && !isNewer(version, best.versionName)) continue;

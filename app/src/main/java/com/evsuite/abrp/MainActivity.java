@@ -281,8 +281,17 @@ public class MainActivity extends AppCompatActivity {
         content.<TextView>findViewById(R.id.about_version)
                 .setText(getString(R.string.about_version, version));
         ImageView qr = content.findViewById(R.id.about_qr_code);
-        android.graphics.Bitmap bitmap = QrCode.generate(REPOSITORY_URL, 416);
-        if (bitmap != null) qr.setImageBitmap(bitmap);
+
+        // If Sami flavor (has custom avatar), show it instead of QR code
+        int customAvatarId = getResources().getIdentifier("about_avatar", "drawable", getPackageName());
+        if (customAvatarId != 0 && qr != null) {
+            qr.setImageResource(customAvatarId);
+            qr.setBackgroundColor(Color.TRANSPARENT);
+            qr.setPadding(0, 0, 0, 0);
+        } else if (qr != null) {
+            android.graphics.Bitmap bitmap = QrCode.generate(REPOSITORY_URL, 416);
+            if (bitmap != null) qr.setImageBitmap(bitmap);
+        }
         content.findViewById(R.id.about_repository).setOnClickListener(v ->
                 startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(REPOSITORY_URL))));
         androidx.appcompat.app.AlertDialog dialog = new MaterialAlertDialogBuilder(this)
