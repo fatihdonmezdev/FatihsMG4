@@ -41,18 +41,16 @@ public class MainActivity extends AppCompatActivity {
 
     /** Navigation destinations in page order. Parallel to {@link #panes}. */
     private static final int[] TAB_IDS =
-            { R.id.tabVehicle, R.id.tabConsumption, R.id.tabCharging, R.id.tabService, R.id.tabWifi,
+            { R.id.tabVehicle, R.id.tabConsumption, R.id.tabCharging, R.id.tabWifi,
               R.id.tabCamera, R.id.tabLog };
 
     private static final int[] PAGE_TITLES = {
             R.string.design_overview_title, R.string.consumption_title, R.string.charging_title,
-            R.string.design_service_title, R.string.design_wifi_title, R.string.design_camera_title,
-            R.string.design_log_title
+            R.string.design_wifi_title, R.string.design_camera_title, R.string.design_log_title
     };
     private static final int[] PAGE_SUBTITLES = {
             R.string.design_overview_subtitle, R.string.consumption_subtitle, R.string.charging_subtitle,
-            R.string.design_service_subtitle, R.string.design_wifi_subtitle, R.string.design_camera_subtitle,
-            R.string.design_log_subtitle
+            R.string.design_wifi_subtitle, R.string.design_camera_subtitle, R.string.design_log_subtitle
     };
 
     // Status colours come from the palette, not from the Material swatches: #4CAF50 and
@@ -89,7 +87,7 @@ public class MainActivity extends AppCompatActivity {
     private final Runnable camReconnectRunnable = new Runnable() {
         @Override
         public void run() {
-            if (currentSelectedPage == 5) { // 5 is R.id.tabCamera
+            if (currentSelectedPage == 4) { // 4 is R.id.tabCamera
                 startLiveCamStream(currentCamUrl);
             }
         }
@@ -201,7 +199,7 @@ public class MainActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.header_title)).setText(PAGE_TITLES[position]);
         ((TextView) findViewById(R.id.header_subtitle)).setText(PAGE_SUBTITLES[position]);
 
-        if (position == 5) {
+        if (position == 4) {
             // Started/resumed Camera tab
             startLiveCamStream(currentCamUrl);
         } else {
@@ -240,14 +238,13 @@ public class MainActivity extends AppCompatActivity {
         // held for the life of the activity, the way it was when the panes were siblings
         // in activity_main.xml — a recycled page would invalidate these references as
         // soon as the user swiped away from it.
-        servicePane = inflatePane(R.layout.pane_service);
         vehiclePane   = inflatePane(R.layout.pane_vehicle);
         consumptionPane = inflatePane(R.layout.pane_consumption);
         chargingPane = inflatePane(R.layout.pane_charging);
         wifiPane    = inflatePane(R.layout.pane_wifi);
         cameraPane  = inflatePane(R.layout.pane_camera);
         logPane     = inflatePane(R.layout.pane_log);
-        panes = new View[] { vehiclePane, consumptionPane, chargingPane, servicePane, wifiPane, cameraPane, logPane };
+        panes = new View[] { vehiclePane, consumptionPane, chargingPane, wifiPane, cameraPane, logPane };
 
         bindVehiclePane();
         bindConsumptionPane();
@@ -255,7 +252,6 @@ public class MainActivity extends AppCompatActivity {
         bindWifiPane();
         bindCameraPane();
 
-        statusText          = servicePane.findViewById(R.id.status_text);
         callLogText = logPane.findViewById(R.id.call_log_text);
         logPane.findViewById(R.id.flush_now_button).setOnClickListener(v -> manualFlush());
 
@@ -1083,6 +1079,7 @@ public class MainActivity extends AppCompatActivity {
     // ---------- Service status ----------
 
     private void refreshStatus() {
+        if (statusText == null) return;
         // The service is always running. Show the cloud sync state derived from the log.
         UploadLog.State state = AbrpUploadService.state();
 
