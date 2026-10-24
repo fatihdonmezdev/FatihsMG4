@@ -117,8 +117,18 @@ final class UpdateHook {
         if (apk == null) return "İndirme veya SHA-256 doğrulaması başarısız ("
                 + update.versionName + ")";
 
-        if (!OtaUpdater.openDownloads(app))
-            return "APK Downloads'a indirildi; dosya yöneticisi açılamadı";
-        return update.versionName + ".apk Downloads'a indirildi — dosyaya dokunup kurun";
+        OtaUpdater.InstallResult result = OtaUpdater.install(app, apk);
+        switch (result) {
+            case SESSION_STARTED:
+                return "Kuruluyor: " + update.versionName + " — kurulum başlatıldı";
+            case INSTALL_UI_STARTED:
+                return "Kurulum ekranı açıldı: " + update.versionName;
+            case UNREADABLE_ARCHIVE:
+                return "Kurulum reddedildi: APK okunamadı veya paket eşleşmedi";
+            default:
+                if (!OtaUpdater.openDownloads(app))
+                    return "APK Downloads'a indirildi; dosya yöneticisi açılamadı";
+                return update.versionName + ".apk Downloads'a indirildi — dosyaya dokunup kurun";
+        }
     }
 }

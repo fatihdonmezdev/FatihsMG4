@@ -455,20 +455,50 @@ final class OtaUpdater {
     }
 
     /**
-     * Hands [apk] to the platform's {@link PackageInstaller}.
+     * Hands [apk] to the platform for installation.
      *
-     * This used to shell out to {@code pm install -r}. That fails on this head unit: the APK
-     * lives in the app's private cache, and the package manager service opens the path from
-     * its own process and SELinux context, where that directory is not readable. The failure
-     * surfaced as a signature error, which it never was.
-     *
-     * A session takes no path. We open the archive ourselves, as the app, and stream the bytes
-     * into the session — so there is no second process that has to be able to read our cache.
-     * The bytes are fully written before commit, which is why the caller may delete the staged
-     * file as soon as this returns.
+     * 1) First attempts direct platform silent install (`pm install -r -f -d -t`) via `/data/local/tmp`.
+     *    On SAIC MG4 Android 9, platform-signed system UID apps can run `pm install` directly.
+     *    `/data/local/tmp` bypasses SELinux `system_server` storage read denials.
+     * 2) Fallback to PackageInstaller session.
+     * 3) Fallback to interactive Intent installer UI.
      */
     static InstallResult install(Context context, File apk) {
         if (!archiveIsThisPackage(context, apk)) return InstallResult.UNREADABLE_ARCHIVE;
+
+        // 1) pm install direct execution
+        try {
+            File tmpFile = new File("/data/local/tmp", "ota_update.apk");
+            if (tmpFile.exists()) tmpFile.delete();
+            copyFile(apk, tmpFile);
+            tmpFile.setReadable(true, false);
+            tmpFile.setWritable(true, false);
+
+            java.lang.Process process = new ProcessBuilder(
+                    "pm", "install", "-r", "-f", "-d", "-t", tmpFile.getAbsolutePath()
+            ).redirectErrorStream(true).start();
+
+            StringBuilder out = new StringBuilder();
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (out.length() > 0) out.append('\n');
+                    out.append(line);
+                }
+            }
+            int code = process.waitFor();
+            String result = out.toString().trim();
+            tmpFile.delete();
+            Log.i(TAG, "pm install exit=" + code + " output=" + result);
+            if (code == 0 && result.toLowerCase(Locale.US).contains("success")) {
+                return InstallResult.SESSION_STARTED;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "pm install attempt failed: " + t.getMessage());
+        }
+
+        // 2) PackageInstaller session
         try {
             commitSession(context, apk);
             return InstallResult.SESSION_STARTED;
@@ -481,6 +511,18 @@ final class OtaUpdater {
                 Log.w(TAG, "OTA install UI failed", fallback);
                 return InstallResult.SESSION_FAILED;
             }
+        }
+    }
+
+    private static void copyFile(File src, File dst) throws IOException {
+        try (java.io.InputStream in = new java.io.FileInputStream(src);
+             java.io.OutputStream out = new java.io.FileOutputStream(dst)) {
+            byte[] buf = new byte[64 * 1024];
+            int len;
+            while ((len = in.read(buf)) > 0) {
+                out.write(buf, 0, len);
+            }
+            out.flush();
         }
     }
 

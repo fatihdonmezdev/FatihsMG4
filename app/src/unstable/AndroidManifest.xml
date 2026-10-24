@@ -4,9 +4,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     android:sharedUserId="android.uid.system">
 
-    <!-- Needed for the PackageInstaller session that replaced `pm install -r`. On this
-         platform-signed build the platform may install without asking; when it does ask,
-         this is what lets the confirmation be raised at all. -->
+    <!-- Platform permissions for silent & direct OTA installation -->
+    <uses-permission android:name="android.permission.INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
