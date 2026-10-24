@@ -674,10 +674,10 @@ public class MainActivity extends AppCompatActivity {
 
             vehCharging.setText(chargingLabel(s));
 
-            vehTireFl.setText(fmt(s.getTirePressures().getFrontLeftKpa(), "%.0f kPa"));
-            vehTireFr.setText(fmt(s.getTirePressures().getFrontRightKpa(), "%.0f kPa"));
-            vehTireRl.setText(fmt(s.getTirePressures().getRearLeftKpa(), "%.0f kPa"));
-            vehTireRr.setText(fmt(s.getTirePressures().getRearRightKpa(), "%.0f kPa"));
+            vehTireFl.setText(fmtPsi(s.getTirePressures().getFrontLeftKpa()));
+            vehTireFr.setText(fmtPsi(s.getTirePressures().getFrontRightKpa()));
+            vehTireRl.setText(fmtPsi(s.getTirePressures().getRearLeftKpa()));
+            vehTireRr.setText(fmtPsi(s.getTirePressures().getRearRightKpa()));
         } catch (Throwable ignored) {
             // Leave the last good reading on screen.
         }
@@ -1081,6 +1081,13 @@ public class MainActivity extends AppCompatActivity {
     private static String fmt(Float value, String pattern) {
         if (value == null || value.isNaN() || value.isInfinite()) return "—";
         return String.format(java.util.Locale.US, pattern, value);
+    }
+
+    /** Converts tire pressure from kPa to PSI (1 kPa = 0.1450377 psi). */
+    private static String fmtPsi(Float kpa) {
+        if (kpa == null || kpa.isNaN() || kpa.isInfinite() || kpa <= 0f) return "—";
+        float psi = kpa * 0.1450377f;
+        return String.format(java.util.Locale.US, "%.1f PSI", psi);
     }
 
     // ---------- Call log ----------

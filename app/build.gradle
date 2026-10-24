@@ -29,6 +29,10 @@ android {
         versionCode 58
         versionName "2.2.41"
 
+        ndk {
+            abiFilters "arm64-v8a"
+        }
+
         buildConfigField "String", "CONSUMPTION_API_URL", "\"${System.getenv('CONSUMPTION_API_URL') ?: project.findProperty('consumption.api.url') ?: 'https://mg-web-app-eta.vercel.app'}\""
         buildConfigField "String", "CONSUMPTION_API_TOKEN", "\"${System.getenv('CONSUMPTION_API_TOKEN') ?: project.findProperty('consumption.api.token') ?: '066da6fc58a0fcd8a35deccb29e43ef7a0b3bcda5a3c2b99db86e64a5b982ec6'}\""
 
