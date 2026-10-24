@@ -73,6 +73,12 @@ Sami için derleme yapılırken Hakkında (`dialog_about.xml`) veya karşılama 
 
 ## 4. GitHub OTA Güncelleme Kanalları (`OtaUpdater.java`)
 
+> [!IMPORTANT]
+> **Versiyon Güncelleme ve UI Eşitlemesi:**
+> Uygulama arayüzünde görünen sürüm (örn: `2.2.45-unstable`), doğrudan `app/build.gradle` dosyasındaki `defaultConfig.versionName` ve `versionCode` değerlerinden üretilir. 
+> - Yeni bir OTA güncellemesi yayınlanırken `defaultConfig.versionName` (örn. `2.2.45`) ve `defaultConfig.versionCode` artırılmalıdır.
+> - GitHub Releases üzerindeki APK dosya adı `FatihsMG4-unstable-<version>.apk` şeklinde `versionName` ile birebir eşleşmelidir; böylece cihazdaki OTA denetleyici hem UI'da sürümü güncellenmiş görür hem de GitHub üzerindeki yeni asset'i tanıyıp otomatik indirir.
+
 Araçların birbirinin APK'sını indirip üzerine kurmasını engellemek için OTA kontrolü **kullanıcı etiketine (`OTA_CHANNEL_TAG`)** göre ayrıştırılır:
 
 1. **Fatih Aracı OTA Kontrolü:**
