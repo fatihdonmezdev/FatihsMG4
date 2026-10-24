@@ -110,9 +110,10 @@ public class VehicleCommandClient {
                     JSONObject cmd = commands.getJSONObject(i);
                     String cmdId = cmd.getString("commandId");
                     String action = cmd.getString("action");
+                    JSONObject params = cmd.optJSONObject("params");
                     Log.i(TAG, "New vehicle command received: " + cmdId + " action=" + action);
 
-                    executeCommand(cmdId, action);
+                    executeCommand(cmdId, action, params);
                 }
             } catch (Exception e) {
                 Log.d(TAG, "Command poll skipped or error: " + e.getMessage());
@@ -120,7 +121,7 @@ public class VehicleCommandClient {
         });
     }
 
-    private void executeCommand(String commandId, String action) {
+    private void executeCommand(String commandId, String action, JSONObject params) {
         if (!isExecuting.compareAndSet(false, true)) {
             Log.w(TAG, "Another command is already executing, skipping: " + commandId);
             return;
@@ -137,20 +138,38 @@ public class VehicleCommandClient {
             boolean success = false;
             String resultMsg = "Executed";
 
+            long customDuration = params != null ? params.optLong("durationMs", 0) : 0;
+
             switch (action) {
                 case "windows_close":
-                    success = runWindowsMove(true, 4500L);
-                    resultMsg = "All windows closed";
+                    long closeDuration = customDuration > 0 ? customDuration : 4500L;
+                    success = runWindowsMove(true, closeDuration);
+                    resultMsg = "All windows closed (" + closeDuration + "ms)";
                     break;
                 case "windows_open":
-                    success = runWindowsMove(false, 4500L);
-                    resultMsg = "All windows opened";
+                    long openDuration = customDuration > 0 ? customDuration : 4500L;
+                    success = runWindowsMove(false, openDuration);
+                    resultMsg = "All windows opened (" + openDuration + "ms)";
                     break;
                 case "windows_vent":
-                    long ventMs = context.getSharedPreferences("abrp_prefs", Context.MODE_PRIVATE)
-                            .getInt("win_custom_duration_ms", 350);
+                    long ventMs = customDuration > 0 ? customDuration : 350L;
                     success = runWindowsMove(false, ventMs);
                     resultMsg = "Windows ventilated (" + ventMs + "ms)";
+                    break;
+                case "windows_pulse_up":
+                    long upMs = customDuration > 0 ? customDuration : 350L;
+                    success = runWindowsMove(true, upMs);
+                    resultMsg = "Windows pulse up (" + upMs + "ms)";
+                    break;
+                case "windows_pulse_down":
+                    long downMs = customDuration > 0 ? customDuration : 350L;
+                    success = runWindowsMove(false, downMs);
+                    resultMsg = "Windows pulse down (" + downMs + "ms)";
+                    break;
+                case "windows_stop":
+                    stopWindowsImmediate();
+                    success = true;
+                    resultMsg = "Windows stopped";
                     break;
                 default:
                     resultMsg = "Unknown action: " + action;
@@ -163,6 +182,19 @@ public class VehicleCommandClient {
             updateCommandStatus(commandId, "failed", e.getMessage());
         } finally {
             isExecuting.set(false);
+        }
+    }
+
+    private void stopWindowsImmediate() {
+        Object cpm = carPropertyAdapter != null ? carPropertyAdapter.cpm : null;
+        if (cpm == null) return;
+        try {
+            Method setFloatMethod = cpm.getClass().getMethod("setFloatProperty", int.class, int.class, float.class);
+            for (int prop : WINDOW_PROPS) {
+                writeWindowProp(cpm, setFloatMethod, prop, CMD_STOP);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "stopWindowsImmediate error", e);
         }
     }
 

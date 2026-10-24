@@ -10,7 +10,6 @@ import android.os.Bundle;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
-import android.widget.SeekBar;
 import android.widget.Toast;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -43,15 +42,15 @@ public class MainActivity extends AppCompatActivity {
     /** Navigation destinations in page order. Parallel to {@link #panes}. */
     private static final int[] TAB_IDS =
             { R.id.tabVehicle, R.id.tabConsumption, R.id.tabCharging, R.id.tabWifi,
-              R.id.tabCamera, R.id.tabWindows, R.id.tabLog };
+              R.id.tabCamera, R.id.tabLog };
 
     private static final int[] PAGE_TITLES = {
             R.string.design_overview_title, R.string.consumption_title, R.string.charging_title,
-            R.string.design_wifi_title, R.string.design_camera_title, R.string.design_windows_title, R.string.design_log_title
+            R.string.design_wifi_title, R.string.design_camera_title, R.string.design_log_title
     };
     private static final int[] PAGE_SUBTITLES = {
             R.string.design_overview_subtitle, R.string.consumption_subtitle, R.string.charging_subtitle,
-            R.string.design_wifi_subtitle, R.string.design_camera_subtitle, R.string.design_windows_subtitle, R.string.design_log_subtitle
+            R.string.design_wifi_subtitle, R.string.design_camera_subtitle, R.string.design_log_subtitle
     };
 
     // Status colours come from the palette, not from the Material swatches: #4CAF50 and
@@ -70,10 +69,6 @@ public class MainActivity extends AppCompatActivity {
     private View chargingPane;
     private View wifiPane;
     private View cameraPane;
-    private View windowsPane;
-
-    private TextView txtWinStatus, txtWinLog;
-    private CarPropertyAdapter mainCarAdapter;
 
     /** The seven pages in navigation order. Parallel to {@link #TAB_IDS}. */
     private View[] panes;
@@ -249,16 +244,14 @@ public class MainActivity extends AppCompatActivity {
         chargingPane = inflatePane(R.layout.pane_charging);
         wifiPane    = inflatePane(R.layout.pane_wifi);
         cameraPane  = inflatePane(R.layout.pane_camera);
-        windowsPane = inflatePane(R.layout.pane_windows);
         logPane     = inflatePane(R.layout.pane_log);
-        panes = new View[] { vehiclePane, consumptionPane, chargingPane, wifiPane, cameraPane, windowsPane, logPane };
+        panes = new View[] { vehiclePane, consumptionPane, chargingPane, wifiPane, cameraPane, logPane };
 
         bindVehiclePane();
         bindConsumptionPane();
         bindChargingPane();
         bindWifiPane();
         bindCameraPane();
-        bindWindowsPane();
 
         callLogText = logPane.findViewById(R.id.call_log_text);
         logPane.findViewById(R.id.flush_now_button).setOnClickListener(v -> manualFlush());
@@ -1164,131 +1157,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         callLogText.setText(sb.toString());
-    }
-
-    // ---------- Windows Test Pane ----------
-
-    private void bindWindowsPane() {
-        txtWinStatus = windowsPane.findViewById(R.id.txt_win_status);
-        txtWinLog = windowsPane.findViewById(R.id.txt_win_log);
-
-        mainCarAdapter = new CarPropertyAdapter(new CarPropertyAdapter.Listener() {
-            @Override
-            public void onConnected() {
-                runOnUiThread(() -> {
-                    if (txtWinStatus != null) {
-                        txtWinStatus.setText("CarPropertyManager: BAĞLI ✓\nGüvenlik Kilidi: " +
-                                (com.evsuite.hardware.VehicleWriteGate.INSTANCE.allow("Test UI Check") ? "Yazma İzinli (Hareketsiz)" : "KİLİTLİ (Hareket Halinde)"));
-                    }
-                });
-            }
-
-            @Override
-            public void onDisconnected() {
-                runOnUiThread(() -> {
-                    if (txtWinStatus != null) txtWinStatus.setText("CarPropertyManager: BAĞLANTI KOPTU");
-                });
-            }
-        });
-        mainCarAdapter.connect(getApplicationContext());
-
-        SeekBar seekDuration = windowsPane.findViewById(R.id.seek_win_duration);
-        TextView txtSliderVal = windowsPane.findViewById(R.id.txt_slider_value);
-
-        int savedDuration = prefs.getInt("win_custom_duration_ms", 350);
-        if (seekDuration != null) {
-            seekDuration.setProgress(savedDuration);
-            if (txtSliderVal != null) txtSliderVal.setText(savedDuration + " ms");
-
-            seekDuration.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                @Override
-                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                    int val = Math.max(50, progress);
-                    if (txtSliderVal != null) txtSliderVal.setText(val + " ms");
-                    prefs.edit().putInt("win_custom_duration_ms", val).apply();
-                }
-                @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-                @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-            });
-        }
-
-        windowsPane.findViewById(R.id.btn_pulse_down).setOnClickListener(v -> {
-            int ms = prefs.getInt("win_custom_duration_ms", 350);
-            triggerPulseAll("İndir", false, ms);
-        });
-
-        windowsPane.findViewById(R.id.btn_pulse_up).setOnClickListener(v -> {
-            int ms = prefs.getInt("win_custom_duration_ms", 350);
-            triggerPulseAll("Kaldır", true, ms);
-        });
-
-        windowsPane.findViewById(R.id.btn_win_open_all).setOnClickListener(v -> triggerPulseAll("Tam Aç", false, 4500L));
-        windowsPane.findViewById(R.id.btn_win_close_all).setOnClickListener(v -> triggerPulseAll("Tam Kapat", true, 4500L));
-        windowsPane.findViewById(R.id.btn_win_stop).setOnClickListener(v -> {
-            stopWindowsImmediate();
-            if (txtWinLog != null) txtWinLog.setText("Son komut: STOP (Motorlar durduruldu)");
-        });
-    }
-
-    private void triggerPulseAll(String label, boolean isUp, long durationMs) {
-        if (!com.evsuite.hardware.VehicleWriteGate.INSTANCE.allow("Direct UI window control")) {
-            if (txtWinLog != null) txtWinLog.setText("REFUS: Araç hareket halinde!");
-            return;
-        }
-
-        if (txtWinLog != null) txtWinLog.setText("Komut başlatıldı: " + label + " (" + durationMs + "ms)...");
-
-        new Thread(() -> {
-            int cmd = isUp ? 1 : 2; // MANUAL_UP : MANUAL_DOWN (Sürücü dahil hepsi kontrollü manuel nabız!)
-            long start = android.os.SystemClock.elapsedRealtime();
-            long deadline = start + durationMs;
-
-            int[] allWindows = { 0x11603801, 0x11603802, 0x11603803, 0x11603804 };
-
-            while (android.os.SystemClock.elapsedRealtime() < deadline) {
-                if (!com.evsuite.hardware.VehicleWriteGate.INSTANCE.allow("Direct UI pulse")) break;
-
-                for (int prop : allWindows) {
-                    writeSingleProp(prop, cmd);
-                }
-                try {
-                    Thread.sleep(100L);
-                } catch (InterruptedException e) {
-                    break;
-                }
-            }
-
-            stopWindowsImmediate();
-
-            runOnUiThread(() -> {
-                if (txtWinLog != null) txtWinLog.setText("Komut tamamlandı: " + label + " (" + durationMs + "ms) ✓");
-            });
-        }).start();
-    }
-
-    private void stopWindowsImmediate() {
-        int[] all = { 0x11603801, 0x11603802, 0x11603803, 0x11603804 };
-        for (int prop : all) {
-            writeSingleProp(prop, 0); // STOP
-        }
-    }
-
-    private boolean writeSingleProp(int propId, int value) {
-        Object cpm = mainCarAdapter != null ? mainCarAdapter.cpm : null;
-        if (cpm == null) return false;
-        try {
-            java.lang.reflect.Method m = cpm.getClass().getMethod("setFloatProperty", int.class, int.class, float.class);
-            try {
-                m.invoke(cpm, propId, 0x1000000, (float) value);
-                return true;
-            } catch (Exception e) {
-                m.invoke(cpm, propId, 0, (float) value);
-                return true;
-            }
-        } catch (Exception e) {
-            android.util.Log.e("MainActivity", "writeSingleProp error: " + e.getMessage());
-            return false;
-        }
     }
 
     // ---------- Service status ----------

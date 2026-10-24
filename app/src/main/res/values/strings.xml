@@ -13,10 +13,7 @@
     <string name="charging_subtitle">Canlı batarya değerleri ve SOC/güç eğrisi</string>
     <string name="tab_wifi">Wi-Fi</string>
     <string name="tab_camera">Kamera</string>
-    <string name="tab_windows">Cam Testi</string>
     <string name="tab_log">Kayıtlar</string>
-    <string name="windows_title">Cam Testi</string>
-    <string name="windows_subtitle">Doğrudan araç kontrolü ve donanım test paneli</string>
     <string name="camera_title">Kamera</string>
     <string name="camera_subtitle">70mai canlı kamera ve geri vites ayarları</string>
 
