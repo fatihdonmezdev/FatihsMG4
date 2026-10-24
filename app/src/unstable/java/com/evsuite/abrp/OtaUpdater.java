@@ -508,7 +508,8 @@ final class OtaUpdater {
                 launchInstallerActivity(context, apk);
                 return InstallResult.INSTALL_UI_STARTED;
             } catch (Throwable fallback) {
-                Log.w(TAG, "OTA install UI failed", fallback);
+                Log.w(TAG, "OTA install UI failed, fallback openDownloads", fallback);
+                openDownloads(context);
                 return InstallResult.SESSION_FAILED;
             }
         }

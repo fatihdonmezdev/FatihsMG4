@@ -50,11 +50,12 @@ public final class OtaInstallResultReceiver extends BroadcastReceiver {
                 toast(context, context.getString(R.string.ota_install_success));
                 break;
             default:
-                // The status message is the package manager's own words — INSTALL_FAILED_*
-                // and friends. Surfaced verbatim, because guessing at it is what made the
-                // previous failure unreadable.
-                toast(context, context.getString(R.string.ota_install_failed,
-                        message != null ? message : "status " + status));
+                // PackageInstaller hatası durumunda (örneğin "paket ayrıştırılamadı" vb.),
+                // DiPlay gibi kullanıcının dosyayı elle yükleyebilmesi için Downloads klasörünü aç
+                OtaUpdater.openDownloads(context);
+                toast(context, "Otomatik kurulum yapılamadı ("
+                        + (message != null ? message : "status " + status)
+                        + "). İndirilenler klasörü açıldı, dosyaya dokunarak kurabilirsiniz.");
                 break;
         }
     }
