@@ -167,18 +167,20 @@ public class ReverseOverlayService extends Service {
             // Reconnect listener if camera stream drops
             mediaPlayer.setEventListener(event -> {
                 if (event.type == MediaPlayer.Event.EncounteredError || event.type == MediaPlayer.Event.EndReached) {
-                    Log.w(TAG, "Stream koptu, 1 sn sonra otomatik yeniden bağlanılıyor...");
+                    CameraLogger.w(this, "Stream koptu/hata: event=" + event.type + " (1 sn sonra otomatik yeniden deneniyor)");
                     if (isOverlayShowing) {
                         monitorHandler.postDelayed(() -> {
                             if (isOverlayShowing) startVlcStream();
                         }, 1000);
                     }
+                } else if (event.type == MediaPlayer.Event.Playing) {
+                    CameraLogger.i(this, "Kamera akışı başarıyla oynatılıyor (Playing)");
                 }
             });
 
             SharedPreferences prefs = getSharedPreferences("abrp_prefs", MODE_PRIVATE);
             String rtspUrl = prefs.getString(PREF_CAM_RTSP_URL, DEFAULT_RTSP_URL);
-            Log.i(TAG, "Starting overlay stream: " + rtspUrl);
+            CameraLogger.i(this, "Geri vites kamerası başlatılıyor: " + rtspUrl);
 
             Media media = new Media(libVLC, Uri.parse(rtspUrl));
             media.setHWDecoderEnabled(false, false);
@@ -194,7 +196,7 @@ public class ReverseOverlayService extends Service {
             media.release();
             mediaPlayer.play();
         } catch (Exception e) {
-            Log.e(TAG, "Overlay VLC error", e);
+            CameraLogger.e(this, "Overlay VLC başlatma hatası", e);
         }
     }
 

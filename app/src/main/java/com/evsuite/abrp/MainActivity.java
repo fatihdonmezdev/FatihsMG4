@@ -539,6 +539,7 @@ public class MainActivity extends AppCompatActivity {
         if (tvCamStatus != null) tvCamStatus.setText("Seçilen: " + label);
         if (tvCamTitleOverlay != null) tvCamTitleOverlay.setText("70mai: " + label);
         appendCamLog(label + " başlatılıyor: " + url);
+        CameraLogger.i(this, "Önizleme başlatılıyor (" + label + "): " + url);
         startLiveCamStream(url);
     }
 
@@ -582,9 +583,11 @@ public class MainActivity extends AppCompatActivity {
 
             camMediaPlayer.setEventListener(event -> {
                 if (event.type == org.videolan.libvlc.MediaPlayer.Event.Playing) {
+                    CameraLogger.i(this, "Önizleme akışı aktif: " + url);
                     runOnUiThread(() -> appendCamLog("Yayın aktif! (" + url + ")"));
                 } else if (event.type == org.videolan.libvlc.MediaPlayer.Event.EncounteredError ||
                            event.type == org.videolan.libvlc.MediaPlayer.Event.EndReached) {
+                    CameraLogger.w(this, "Önizleme akışı kesildi: event=" + event.type + " url=" + url);
                     runOnUiThread(() -> {
                         appendCamLog("Yayın kesildi, 1 sn sonra yeniden bağlanılıyor...");
                         camReconnectHandler.removeCallbacks(camReconnectRunnable);
@@ -595,6 +598,7 @@ public class MainActivity extends AppCompatActivity {
 
             camMediaPlayer.play();
         } catch (Exception e) {
+            CameraLogger.e(this, "Önizleme başlatma hatası: " + url, e);
             appendCamLog("Hata: " + e.getMessage());
             camReconnectHandler.removeCallbacks(camReconnectRunnable);
             camReconnectHandler.postDelayed(camReconnectRunnable, 1000);
