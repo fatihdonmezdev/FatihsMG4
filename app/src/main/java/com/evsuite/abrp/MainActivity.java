@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
+import android.widget.SeekBar;
 import android.widget.Toast;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -1191,25 +1192,45 @@ public class MainActivity extends AppCompatActivity {
         });
         mainCarAdapter.connect(getApplicationContext());
 
-        windowsPane.findViewById(R.id.btn_win_vent).setOnClickListener(v -> triggerWindowAction("Havalandır (%15)", false, 1200L));
-        windowsPane.findViewById(R.id.btn_win_open_all).setOnClickListener(v -> triggerWindowAction("Tam Aç", false, 5000L));
-        windowsPane.findViewById(R.id.btn_win_close_all).setOnClickListener(v -> triggerWindowAction("Tam Kapat", true, 5000L));
+        SeekBar seekDuration = windowsPane.findViewById(R.id.seek_win_duration);
+        TextView txtSliderVal = windowsPane.findViewById(R.id.txt_slider_value);
+
+        int savedDuration = prefs.getInt("win_custom_duration_ms", 350);
+        if (seekDuration != null) {
+            seekDuration.setProgress(savedDuration);
+            if (txtSliderVal != null) txtSliderVal.setText(savedDuration + " ms");
+
+            seekDuration.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    int val = Math.max(50, progress);
+                    if (txtSliderVal != null) txtSliderVal.setText(val + " ms");
+                    prefs.edit().putInt("win_custom_duration_ms", val).apply();
+                }
+                @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+                @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+            });
+        }
+
+        windowsPane.findViewById(R.id.btn_pulse_down).setOnClickListener(v -> {
+            int ms = prefs.getInt("win_custom_duration_ms", 350);
+            triggerPulseAll("İndir", false, ms);
+        });
+
+        windowsPane.findViewById(R.id.btn_pulse_up).setOnClickListener(v -> {
+            int ms = prefs.getInt("win_custom_duration_ms", 350);
+            triggerPulseAll("Kaldır", true, ms);
+        });
+
+        windowsPane.findViewById(R.id.btn_win_open_all).setOnClickListener(v -> triggerPulseAll("Tam Aç", false, 4500L));
+        windowsPane.findViewById(R.id.btn_win_close_all).setOnClickListener(v -> triggerPulseAll("Tam Kapat", true, 4500L));
         windowsPane.findViewById(R.id.btn_win_stop).setOnClickListener(v -> {
             stopWindowsImmediate();
             if (txtWinLog != null) txtWinLog.setText("Son komut: STOP (Motorlar durduruldu)");
         });
-
-        windowsPane.findViewById(R.id.btn_driver_down).setOnClickListener(v -> {
-            boolean ok = writeSingleProp(0x11603801, 4); // AUTO_DOWN
-            if (txtWinLog != null) txtWinLog.setText("Sürücü İndir (AUTO_DOWN 4) -> " + (ok ? "GÖNDERİLDİ ✓" : "HATA"));
-        });
-        windowsPane.findViewById(R.id.btn_driver_up).setOnClickListener(v -> {
-            boolean ok = writeSingleProp(0x11603801, 3); // AUTO_UP
-            if (txtWinLog != null) txtWinLog.setText("Sürücü Kaldır (AUTO_UP 3) -> " + (ok ? "GÖNDERİLDİ ✓" : "HATA"));
-        });
     }
 
-    private void triggerWindowAction(String label, boolean isUp, long durationMs) {
+    private void triggerPulseAll(String label, boolean isUp, long durationMs) {
         if (!com.evsuite.hardware.VehicleWriteGate.INSTANCE.allow("Direct UI window control")) {
             if (txtWinLog != null) txtWinLog.setText("REFUS: Araç hareket halinde!");
             return;
@@ -1218,25 +1239,20 @@ public class MainActivity extends AppCompatActivity {
         if (txtWinLog != null) txtWinLog.setText("Komut başlatıldı: " + label + " (" + durationMs + "ms)...");
 
         new Thread(() -> {
-            int manualCmd = isUp ? 1 : 2; // MANUAL_UP : MANUAL_DOWN
-            int autoCmd   = isUp ? 3 : 4; // AUTO_UP   : AUTO_DOWN
-
-            // Sürücü
-            writeSingleProp(0x11603801, autoCmd);
-
+            int cmd = isUp ? 1 : 2; // MANUAL_UP : MANUAL_DOWN (Sürücü dahil hepsi kontrollü manuel nabız!)
             long start = android.os.SystemClock.elapsedRealtime();
             long deadline = start + durationMs;
 
-            int[] otherWindows = { 0x11603802, 0x11603803, 0x11603804 };
+            int[] allWindows = { 0x11603801, 0x11603802, 0x11603803, 0x11603804 };
 
             while (android.os.SystemClock.elapsedRealtime() < deadline) {
                 if (!com.evsuite.hardware.VehicleWriteGate.INSTANCE.allow("Direct UI pulse")) break;
 
-                for (int prop : otherWindows) {
-                    writeSingleProp(prop, manualCmd);
+                for (int prop : allWindows) {
+                    writeSingleProp(prop, cmd);
                 }
                 try {
-                    Thread.sleep(120L);
+                    Thread.sleep(100L);
                 } catch (InterruptedException e) {
                     break;
                 }
@@ -1245,7 +1261,7 @@ public class MainActivity extends AppCompatActivity {
             stopWindowsImmediate();
 
             runOnUiThread(() -> {
-                if (txtWinLog != null) txtWinLog.setText("Komut tamamlandı: " + label + " ✓");
+                if (txtWinLog != null) txtWinLog.setText("Komut tamamlandı: " + label + " (" + durationMs + "ms) ✓");
             });
         }).start();
     }

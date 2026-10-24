@@ -139,16 +139,18 @@ public class VehicleCommandClient {
 
             switch (action) {
                 case "windows_close":
-                    success = runWindowsMove(true, FULL_COURSE_MS);
+                    success = runWindowsMove(true, 4500L);
                     resultMsg = "All windows closed";
                     break;
                 case "windows_open":
-                    success = runWindowsMove(false, FULL_COURSE_MS);
+                    success = runWindowsMove(false, 4500L);
                     resultMsg = "All windows opened";
                     break;
                 case "windows_vent":
-                    success = runWindowsMove(false, VENT_COURSE_MS);
-                    resultMsg = "Windows ventilated";
+                    long ventMs = context.getSharedPreferences("abrp_prefs", Context.MODE_PRIVATE)
+                            .getInt("win_custom_duration_ms", 350);
+                    success = runWindowsMove(false, ventMs);
+                    resultMsg = "Windows ventilated (" + ventMs + "ms)";
                     break;
                 default:
                     resultMsg = "Unknown action: " + action;
@@ -180,12 +182,7 @@ public class VehicleCommandClient {
         }
 
         int manualCmd = isUp ? CMD_MANUAL_UP : CMD_MANUAL_DOWN;
-        int autoCmd   = isUp ? CMD_AUTO_UP   : CMD_AUTO_DOWN;
 
-        // 1. Driver window has native auto: trigger auto once
-        writeWindowProp(cpm, setFloatMethod, WINDOW_PROPS[0], autoCmd);
-
-        // 2. Other windows (and fallback for driver): pulse manual command for durationMs
         long startMs = SystemClock.elapsedRealtime();
         long deadline = startMs + durationMs;
 
@@ -196,12 +193,13 @@ public class VehicleCommandClient {
                 break;
             }
 
-            for (int i = 1; i < WINDOW_PROPS.length; i++) {
-                writeWindowProp(cpm, setFloatMethod, WINDOW_PROPS[i], manualCmd);
+            // Sürücü dahil tüm 4 camı kontrollü manuel darbeyle hareket ettir
+            for (int prop : WINDOW_PROPS) {
+                writeWindowProp(cpm, setFloatMethod, prop, manualCmd);
             }
 
             try {
-                Thread.sleep(HOLD_REPEAT_MS);
+                Thread.sleep(100L);
             } catch (InterruptedException e) {
                 break;
             }

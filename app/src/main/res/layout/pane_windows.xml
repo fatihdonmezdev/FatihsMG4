@@ -46,7 +46,7 @@
 
         <Space android:layout_width="1dp" android:layout_height="20dp" />
 
-        <!-- Test Buttons Card -->
+        <!-- Slider & Custom Duration Card -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -54,59 +54,79 @@
             android:padding="24dp"
             android:background="@drawable/bg_glass">
 
-            <TextView
-                android:layout_width="match_parent"
+            <div android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="TÜM CAMLAR KONTROLÜ (DOĞRUDAN SİNYAL)"
-                android:textAppearance="@style/Text.EV.Eyebrow" />
+                android:orientation="horizontal">
+            </div>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="16dp">
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="TUŞA BASMA SÜRESİ (PULSE DURATION)"
+                    android:textAppearance="@style/Text.EV.Eyebrow" />
+
+                <TextView
+                    android:id="@+id/txt_slider_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="350 ms"
+                    android:textColor="@color/ev_accent"
+                    android:textStyle="bold"
+                    android:textSize="18sp" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/seek_win_duration"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp"
+                android:max="3000"
+                android:progress="350" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Aralık (havalandırma) için 250 - 450 ms arası idealdir. Tam açma/kapatma için 3500 - 5000 ms."
+                android:textAppearance="@style/Text.EV.Secondary"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="20dp">
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_win_vent"
+                    android:id="@+id/btn_pulse_down"
                     style="@style/Widget.EV.Button"
                     android:layout_width="0dp"
                     android:layout_height="64dp"
                     android:layout_weight="1"
                     android:layout_marginEnd="8dp"
-                    android:text="Havalandır (%15)" />
+                    android:text="Seçilen Süre İNDİR" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_win_open_all"
-                    style="@style/Widget.EV.Button"
-                    android:layout_width="0dp"
-                    android:layout_height="64dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="4dp"
-                    android:layout_marginEnd="4dp"
-                    android:text="Tam Aç" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_win_close_all"
+                    android:id="@+id/btn_pulse_up"
                     style="@style/Widget.EV.Button"
                     android:layout_width="0dp"
                     android:layout_height="64dp"
                     android:layout_weight="1"
                     android:layout_marginStart="8dp"
-                    android:text="Tam Kapat" />
+                    android:text="Seçilen Süre KALDIR" />
             </LinearLayout>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_win_stop"
-                style="@style/Widget.EV.Button.Outlined"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="16dp"
-                android:text="Motorları Durdur (STOP)" />
         </LinearLayout>
 
         <Space android:layout_width="1dp" android:layout_height="20dp" />
 
-        <!-- Driver Only Card -->
+        <!-- Preset Actions Card -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -117,7 +137,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="SÜRÜCÜ CAMI (NATIVE AUTO SİNYALİ)"
+                android:text="HAZIR HIZLI KOMUTLAR"
                 android:textAppearance="@style/Text.EV.Eyebrow" />
 
             <LinearLayout
@@ -127,22 +147,32 @@
                 android:layout_marginTop="16dp">
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_driver_down"
+                    android:id="@+id/btn_win_open_all"
                     style="@style/Widget.EV.Button.Outlined"
                     android:layout_width="0dp"
-                    android:layout_height="56dp"
+                    android:layout_height="64dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
-                    android:text="Sürücü İndir" />
+                    android:layout_marginEnd="6dp"
+                    android:text="Tam Aç (5s)" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_driver_up"
+                    android:id="@+id/btn_win_close_all"
                     style="@style/Widget.EV.Button.Outlined"
                     android:layout_width="0dp"
-                    android:layout_height="56dp"
+                    android:layout_height="64dp"
                     android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    android:text="Sürücü Kaldır" />
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:text="Tam Kapat (5s)" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_win_stop"
+                    style="@style/Widget.EV.Button.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="STOP (Durdur)" />
             </LinearLayout>
         </LinearLayout>
 
