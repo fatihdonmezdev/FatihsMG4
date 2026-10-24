@@ -87,6 +87,41 @@ final class WifiAutoConnect {
     }
 
     /**
+     * Connects directly to a specific saved network by name.
+     */
+    Result connectTo(String targetSsid) {
+        if (wifi == null) return Result.UNSUPPORTED;
+        if (targetSsid == null || targetSsid.trim().isEmpty()) return Result.REFUSED;
+
+        String cleanTarget = targetSsid.replace("\"", "").trim();
+
+        try {
+            if (!wifi.isWifiEnabled()) {
+                if (!wifi.setWifiEnabled(true)) return Result.CANNOT_ENABLE;
+            }
+
+            List<WifiConfiguration> saved = wifi.getConfiguredNetworks();
+            if (saved == null || saved.isEmpty()) return Result.NO_SAVED_NETWORKS;
+
+            for (WifiConfiguration c : saved) {
+                if (c == null || c.SSID == null) continue;
+                String name = c.SSID.replace("\"", "").trim();
+                if (name.equalsIgnoreCase(cleanTarget)) {
+                    wifi.disconnect();
+                    boolean ok = wifi.enableNetwork(c.networkId, true);
+                    wifi.reconnect();
+                    Log.i(TAG, "connectTo " + name + " accepted=" + ok);
+                    return ok ? Result.attempting(name) : Result.REFUSED;
+                }
+            }
+            return Result.REFUSED;
+        } catch (Throwable t) {
+            Log.w(TAG, "connectTo error: " + t.getMessage());
+            return Result.REFUSED;
+        }
+    }
+
+    /**
      * One attempt to get onto a saved network, rate-limited.
      *
      * @param force ignore the rate limit — for the button, which a driver only presses

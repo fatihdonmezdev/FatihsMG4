@@ -96,6 +96,7 @@ public class MainActivity extends AppCompatActivity {
     /** Wi-Fi page. The helper is the same one the upload service uses on its own tick. */
     private WifiAutoConnect wifi;
     private TextView wifiSsid, wifiState, wifiSavedList;
+    private android.widget.LinearLayout wifiSavedContainer;
 
     /**
      * Value cells of the Vehicle page, looked up once and refreshed on the UI tick.
@@ -399,6 +400,7 @@ public class MainActivity extends AppCompatActivity {
         wifiSsid      = wifiPane.findViewById(R.id.wifi_ssid);
         wifiState     = wifiPane.findViewById(R.id.wifi_state);
         wifiSavedList = wifiPane.findViewById(R.id.wifi_saved_list);
+        wifiSavedContainer = wifiPane.findViewById(R.id.wifi_saved_container);
 
         SwitchMaterial auto = wifiPane.findViewById(R.id.wifi_auto_switch);
         auto.setChecked(prefs.getBoolean(WIFI_AUTO_KEY, true));
@@ -422,13 +424,38 @@ public class MainActivity extends AppCompatActivity {
         } else if (!wifi.isWifiEnabled()) {
             wifiState.setText("Wi-Fi kapalı");
         }
-        // Left alone otherwise: a message the button just set says more about what is
-        // happening than "not connected" would.
 
         java.util.List<String> saved = wifi.savedNetworkNames();
-        wifiSavedList.setText(saved.isEmpty()
-                ? getString(R.string.wifi_saved_empty)
-                : android.text.TextUtils.join("\n", saved));
+        if (wifiSavedContainer != null) {
+            wifiSavedContainer.removeAllViews();
+            if (saved.isEmpty()) {
+                if (wifiSavedList != null) wifiSavedList.setText(getString(R.string.wifi_saved_empty));
+            } else {
+                if (wifiSavedList != null) wifiSavedList.setText("");
+                for (String net : saved) {
+                    MaterialButton btn = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+                    android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                            (int) (52 * getResources().getDisplayMetrics().density));
+                    lp.topMargin = (int) (6 * getResources().getDisplayMetrics().density);
+                    btn.setLayoutParams(lp);
+                    boolean isCur = net.equalsIgnoreCase(ssid);
+                    btn.setText(isCur ? "● " + net + " (Bağlı)" : net);
+                    btn.setTextSize(14f);
+                    btn.setOnClickListener(v -> {
+                        wifiState.setText("Bağlanılıyor: " + net);
+                        WifiAutoConnect.Result r = wifi.connectTo(net);
+                        wifiState.setText(r.message);
+                        refreshWifi();
+                    });
+                    wifiSavedContainer.addView(btn);
+                }
+            }
+        } else if (wifiSavedList != null) {
+            wifiSavedList.setText(saved.isEmpty()
+                    ? getString(R.string.wifi_saved_empty)
+                    : android.text.TextUtils.join("\n", saved));
+        }
     }
 
     // ---------- Camera page ----------
@@ -447,6 +474,11 @@ public class MainActivity extends AppCompatActivity {
         currentCamUrl = prefs.getString(ReverseOverlayService.PREF_CAM_RTSP_URL, ReverseOverlayService.DEFAULT_RTSP_URL);
         if (etRtspUrl != null) {
             etRtspUrl.setText(currentCamUrl);
+            etRtspUrl.setOnClickListener(v -> {
+                etRtspUrl.requestFocus();
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) imm.showSoftInput(etRtspUrl, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            });
         }
 
         boolean revEnabled = prefs.getBoolean(ReverseOverlayService.PREF_REVERSE_CAM_ENABLED, true);

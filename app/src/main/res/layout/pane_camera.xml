@@ -58,6 +58,11 @@
                 android:minHeight="52dp"
                 android:hint="rtsp://192.168.0.1:554/livestream/22"
                 android:singleLine="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:cursorVisible="true"
+                android:inputType="textUri"
+                android:imeOptions="actionDone"
                 android:textSize="13sp" />
         </com.google.android.material.textfield.TextInputLayout>
 

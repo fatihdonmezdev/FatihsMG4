@@ -11,8 +11,14 @@
         </LinearLayout>
         <Space android:layout_width="1dp" android:layout_height="20dp" />
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="24dp" android:background="@drawable/bg_glass">
-            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/wifi_saved_title" android:textAppearance="@style/Text.EV.Eyebrow" />
-            <TextView android:id="@+id/wifi_saved_list" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp" android:textAppearance="@style/Text.EV.Body" android:lineSpacingExtra="16dp" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="KAYITLI AĞLAR (DOKUNUP BAĞLAN)" android:textAppearance="@style/Text.EV.Eyebrow" />
+            <LinearLayout
+                android:id="@+id/wifi_saved_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="vertical" />
+            <TextView android:id="@+id/wifi_saved_list" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textAppearance="@style/Text.EV.Secondary" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>
