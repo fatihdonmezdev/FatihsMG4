@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:clipToPadding="false">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <!-- Status Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:background="@drawable/bg_glass">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="DONANIM VE GÜVENLİK DURUMU"
+                android:textAppearance="@style/Text.EV.Eyebrow" />
+
+            <TextView
+                android:id="@+id/txt_win_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Bağlantı kontrol ediliyor…"
+                android:textAppearance="@style/Text.EV.Body"
+                android:textColor="@color/ev_text_primary" />
+
+            <TextView
+                android:id="@+id/txt_win_log"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Son komut: —"
+                android:textAppearance="@style/Text.EV.Secondary" />
+        </LinearLayout>
+
+        <Space android:layout_width="1dp" android:layout_height="20dp" />
+
+        <!-- Test Buttons Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:background="@drawable/bg_glass">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="TÜM CAMLAR KONTROLÜ (DOĞRUDAN SİNYAL)"
+                android:textAppearance="@style/Text.EV.Eyebrow" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="16dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_win_vent"
+                    style="@style/Widget.EV.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    android:text="Havalandır (%15)" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_win_open_all"
+                    style="@style/Widget.EV.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp"
+                    android:text="Tam Aç" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_win_close_all"
+                    style="@style/Widget.EV.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:text="Tam Kapat" />
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_win_stop"
+                style="@style/Widget.EV.Button.Outlined"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="16dp"
+                android:text="Motorları Durdur (STOP)" />
+        </LinearLayout>
+
+        <Space android:layout_width="1dp" android:layout_height="20dp" />
+
+        <!-- Driver Only Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:background="@drawable/bg_glass">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="SÜRÜCÜ CAMI (NATIVE AUTO SİNYALİ)"
+                android:textAppearance="@style/Text.EV.Eyebrow" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="16dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_driver_down"
+                    style="@style/Widget.EV.Button.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    android:text="Sürücü İndir" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_driver_up"
+                    style="@style/Widget.EV.Button.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:text="Sürücü Kaldır" />
+            </LinearLayout>
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>
