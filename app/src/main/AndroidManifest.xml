@@ -27,6 +27,7 @@
     <uses-permission android:name="android.car.permission.CAR_ENERGY_PORTS" />
     <uses-permission android:name="android.car.permission.CAR_EXTERIOR_ENVIRONMENT" />
     <uses-permission android:name="android.car.permission.CONTROL_CAR_CLIMATE" />
+    <uses-permission android:name="android.car.permission.CONTROL_CAR_SEATS" />
     <uses-permission android:name="android.car.permission.CAR_VENDOR_EXTENSION" />
     <!-- Optional telemetry: odometer, tyre pressures and the nominal pack capacity.
          All three are privileged on AAOS, so an install that is not platform-signed

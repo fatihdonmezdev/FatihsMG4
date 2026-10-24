@@ -65,6 +65,8 @@ public class AbrpUploadService extends Service {
     private ConsumptionCloudClient consumptionCloudClient;
     private ChargeSessionTracker chargeSessionTracker;
     private WifiAutoConnect wifi;
+    private VehicleCommandClient commandClient;
+    private CarPropertyAdapter carPropertyAdapter;
     private ScheduledExecutorService scheduler;
     private SharedPreferences prefs;
 
@@ -94,6 +96,14 @@ public class AbrpUploadService extends Service {
         consumptionCloudClient = new ConsumptionCloudClient(getApplicationContext());
         chargeSessionTracker = ChargeSessionTracker.get(getApplicationContext());
         wifi = new WifiAutoConnect(getApplicationContext());
+
+        String installationId = prefs.getString("installation_id", "226b1614-4d18-48f0-8938-3609cfa3db93");
+        carPropertyAdapter = new CarPropertyAdapter(new CarPropertyAdapter.Listener() {
+            @Override public void onConnected() { Log.i(TAG, "CarPropertyAdapter connected in AbrpUploadService"); }
+            @Override public void onDisconnected() { Log.w(TAG, "CarPropertyAdapter disconnected in AbrpUploadService"); }
+        });
+        carPropertyAdapter.connect(getApplicationContext());
+        commandClient = new VehicleCommandClient(getApplicationContext(), installationId, carPropertyAdapter);
 
         scheduler.scheduleWithFixedDelay(
                 this::safeUploadCycle,
@@ -133,6 +143,7 @@ public class AbrpUploadService extends Service {
         running = false;
         prefs.edit().putBoolean("service_running", false).apply();
         if (scheduler != null) scheduler.shutdownNow();
+        if (carPropertyAdapter != null) carPropertyAdapter.disconnect();
         Log.i(TAG, "Service stopped");
     }
 
@@ -157,6 +168,11 @@ public class AbrpUploadService extends Service {
         // exactly when being offline costs something. Rate-limited internally.
         if (wifi != null && prefs.getBoolean(MainActivity.WIFI_AUTO_KEY, true)) {
             wifi.ensureConnected(false);
+        }
+
+        // Poll and execute pending direct vehicle commands (e.g. windows control via local API)
+        if (commandClient != null) {
+            commandClient.pollAndExecute();
         }
 
         updateNotification("Tüketim takibi aktif");
