@@ -413,27 +413,27 @@ final class OtaUpdater {
         return out.toString();
     }
 
-    /** Opens Android's document UI directly in Downloads; the driver chooses the APK. */
+    /** Opens Android's Downloads UI directly so driver can tap the APK to install. */
     static boolean openDownloads(Context context) {
-        Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT)
-                .addCategory(Intent.CATEGORY_OPENABLE)
-                .setType("application/vnd.android.package-archive")
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        if (Build.VERSION.SDK_INT >= 26) {
-            picker.putExtra("android.provider.extra.INITIAL_URI", Uri.parse(
-                    "content://com.android.externalstorage.documents/document/primary%3ADownload"));
-        }
         try {
-            context.startActivity(picker);
+            Intent downloads = new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(downloads);
             return true;
-        } catch (Throwable first) {
+        } catch (Throwable t) {
             try {
-                Intent downloads = new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
+                Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                        .addCategory(Intent.CATEGORY_OPENABLE)
+                        .setType("application/vnd.android.package-archive")
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                context.startActivity(downloads);
+                if (Build.VERSION.SDK_INT >= 26) {
+                    picker.putExtra("android.provider.extra.INITIAL_URI", Uri.parse(
+                            "content://com.android.externalstorage.documents/document/primary%3ADownload"));
+                }
+                context.startActivity(picker);
                 return true;
-            } catch (Throwable second) {
-                Log.w(TAG, "No Downloads UI available", second);
+            } catch (Throwable ignored) {
+                Log.w(TAG, "No Downloads UI available", t);
                 return false;
             }
         }
@@ -466,53 +466,13 @@ final class OtaUpdater {
     static InstallResult install(Context context, File apk) {
         if (!archiveIsThisPackage(context, apk)) return InstallResult.UNREADABLE_ARCHIVE;
 
-        // 1) pm install direct execution
-        try {
-            File tmpFile = new File("/data/local/tmp", "ota_update.apk");
-            if (tmpFile.exists()) tmpFile.delete();
-            copyFile(apk, tmpFile);
-            tmpFile.setReadable(true, false);
-            tmpFile.setWritable(true, false);
-
-            java.lang.Process process = new ProcessBuilder(
-                    "pm", "install", "-r", "-f", "-d", "-t", tmpFile.getAbsolutePath()
-            ).redirectErrorStream(true).start();
-
-            StringBuilder out = new StringBuilder();
-            try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (out.length() > 0) out.append('\n');
-                    out.append(line);
-                }
-            }
-            int code = process.waitFor();
-            String result = out.toString().trim();
-            tmpFile.delete();
-            Log.i(TAG, "pm install exit=" + code + " output=" + result);
-            if (code == 0 && result.toLowerCase(Locale.US).contains("success")) {
-                return InstallResult.SESSION_STARTED;
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "pm install attempt failed: " + t.getMessage());
-        }
-
-        // 2) PackageInstaller session
-        try {
-            commitSession(context, apk);
-            return InstallResult.SESSION_STARTED;
-        } catch (Throwable t) {
-            Log.w(TAG, "OTA session install failed; trying system install UI", t);
-            try {
-                launchInstallerActivity(context, apk);
-                return InstallResult.INSTALL_UI_STARTED;
-            } catch (Throwable fallback) {
-                Log.w(TAG, "OTA install UI failed, fallback openDownloads", fallback);
-                openDownloads(context);
-                return InstallResult.SESSION_FAILED;
-            }
-        }
+        // MG4 head unit blocks PackageInstaller sessions for 3rd-party/non-system OEM volumes
+        // and throws "For security reasons, system cannot issue Uri permission grant to system_server"
+        // on Intent.ACTION_VIEW when called from system uid.
+        // The most reliable, error-free path is directly opening the Downloads folder (like DiPlay)
+        // so the user can tap the verified APK without parsing/permission errors.
+        openDownloads(context);
+        return InstallResult.INSTALL_UI_STARTED;
     }
 
     private static void copyFile(File src, File dst) throws IOException {

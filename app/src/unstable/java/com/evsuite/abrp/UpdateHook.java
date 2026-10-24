@@ -118,17 +118,9 @@ final class UpdateHook {
                 + update.versionName + ")";
 
         OtaUpdater.InstallResult result = OtaUpdater.install(app, apk);
-        switch (result) {
-            case SESSION_STARTED:
-                return "Kuruluyor: " + update.versionName + " — kurulum başlatıldı";
-            case INSTALL_UI_STARTED:
-                return "Kurulum ekranı açıldı: " + update.versionName;
-            case UNREADABLE_ARCHIVE:
-                return "Kurulum reddedildi: APK okunamadı veya paket eşleşmedi";
-            default:
-                if (!OtaUpdater.openDownloads(app))
-                    return "APK Downloads'a indirildi; dosya yöneticisi açılamadı";
-                return update.versionName + ".apk Downloads'a indirildi — dosyaya dokunup kurun";
+        if (result == OtaUpdater.InstallResult.UNREADABLE_ARCHIVE) {
+            return "Kurulum reddedildi: APK okunamadı veya paket eşleşmedi";
         }
+        return update.versionName + ".apk İndirilenler klasörüne hazırlandı — listeden dokunup kurabilirsiniz";
     }
 }
