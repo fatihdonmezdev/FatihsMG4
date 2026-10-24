@@ -70,9 +70,14 @@ public final class CameraLogger {
                 entry.put("tag", "Camera");
                 entry.put("level", level);
                 entry.put("message", message);
+
+                // Collect deep network diagnostics (SSID, IP, Gateway, Ping/Socket status)
+                JSONObject netDiag = collectNetworkDiagnostics(appContext);
                 if (details != null && !details.isEmpty()) {
-                    entry.put("details", details);
+                    netDiag.put("errorDetails", details);
                 }
+                entry.put("details", netDiag);
+
                 synchronized (ISO_FORMAT) {
                     entry.put("timestamp", ISO_FORMAT.format(new Date()));
                 }
@@ -88,6 +93,54 @@ public final class CameraLogger {
                 Log.w(TAG, "Log buffering failed: " + t.getMessage());
             }
         });
+    }
+
+    private static JSONObject collectNetworkDiagnostics(Context context) {
+        JSONObject diag = new JSONObject();
+        try {
+            android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager)
+                    context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            if (wm != null) {
+                android.net.wifi.WifiInfo info = wm.getConnectionInfo();
+                if (info != null) {
+                    String ssid = info.getSSID();
+                    if (ssid != null && ssid.startsWith("\"") && ssid.endsWith("\"")) {
+                        ssid = ssid.substring(1, ssid.length() - 1);
+                    }
+                    diag.put("wifiSsid", ssid);
+                    diag.put("bssid", info.getBSSID());
+                    diag.put("rssi", info.getRssi());
+
+                    int ip = info.getIpAddress();
+                    String ipStr = String.format(Locale.US, "%d.%d.%d.%d",
+                            (ip & 0xff), (ip >> 8 & 0xff), (ip >> 16 & 0xff), (ip >> 24 & 0xff));
+                    diag.put("deviceIp", ipStr);
+                }
+
+                android.net.DhcpInfo dhcp = wm.getDhcpInfo();
+                if (dhcp != null) {
+                    int gw = dhcp.gateway;
+                    String gwStr = String.format(Locale.US, "%d.%d.%d.%d",
+                            (gw & 0xff), (gw >> 8 & 0xff), (gw >> 16 & 0xff), (gw >> 24 & 0xff));
+                    diag.put("gatewayIp", gwStr);
+                }
+            }
+
+            // Quick socket test to 192.168.0.1:554 (70mai default)
+            boolean rtspPortReachable = testSocket("192.168.0.1", 554, 400);
+            diag.put("rtsp554Reachable", rtspPortReachable);
+
+        } catch (Throwable ignored) {}
+        return diag;
+    }
+
+    private static boolean testSocket(String host, int port, int timeoutMs) {
+        try (java.net.Socket socket = new java.net.Socket()) {
+            socket.connect(new java.net.InetSocketAddress(host, port), timeoutMs);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     private static synchronized void appendCache(Context context, JSONObject entry) {
