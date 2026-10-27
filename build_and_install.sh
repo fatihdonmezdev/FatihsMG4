@@ -2,12 +2,16 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-if [ -d "/opt/homebrew/share/android-commandlinetools/build-tools/36.0.0" ]; then
+if [ -d "/Users/tcfdonmez/Android/Sdk/build-tools/36.0.0" ]; then
+    BUILD_TOOLS="/Users/tcfdonmez/Android/Sdk/build-tools/36.0.0"
+elif [ -d "/Users/tcfdonmez/Android/Sdk/build-tools/35.0.0" ]; then
+    BUILD_TOOLS="/Users/tcfdonmez/Android/Sdk/build-tools/35.0.0"
+elif [ -d "/opt/homebrew/share/android-commandlinetools/build-tools/36.0.0" ]; then
     BUILD_TOOLS="/opt/homebrew/share/android-commandlinetools/build-tools/36.0.0"
 elif [ -d "/opt/homebrew/share/android-commandlinetools/build-tools/35.0.0" ]; then
     BUILD_TOOLS="/opt/homebrew/share/android-commandlinetools/build-tools/35.0.0"
 else
-    BUILD_TOOLS="$(find /opt/homebrew -name zipalign 2>/dev/null | head -n 1 | xargs dirname || echo "")"
+    BUILD_TOOLS="$(find /opt/homebrew /Users/tcfdonmez/Android/Sdk -name zipalign 2>/dev/null | head -n 1 | xargs dirname || echo "")"
 fi
 
 ZIPALIGN="$BUILD_TOOLS/zipalign"
