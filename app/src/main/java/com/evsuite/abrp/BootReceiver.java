@@ -28,7 +28,9 @@ public class BootReceiver extends BroadcastReceiver {
             Intent.ACTION_MY_PACKAGE_REPLACED,
             "android.intent.action.LOCKED_BOOT_COMPLETED",
             "android.intent.action.QUICKBOOT_POWERON",
-            "com.htc.intent.action.QUICKBOOT_POWERON"
+            "com.htc.intent.action.QUICKBOOT_POWERON",
+            Intent.ACTION_SCREEN_ON,
+            Intent.ACTION_USER_PRESENT
     ));
 
     @Override

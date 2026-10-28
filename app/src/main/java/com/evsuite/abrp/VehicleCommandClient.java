@@ -34,6 +34,10 @@ public class VehicleCommandClient {
 
     private static final String TAG = "VehicleCommandClient";
     private static final String BASE_URL = "https://mg-web-app-eta.vercel.app/api/vehicle/commands";
+    private static final String PING_URL = "https://mg-web-app-eta.vercel.app/api/vehicle/ping";
+
+    private long lastPingTimeMs = 0L;
+    private static final long PING_INTERVAL_MS = 60_000L; // En az dakikada bir ping at
 
     // Power window property IDs on MG4 (AOSP / SAIC CarPropertyManager)
     // 0x11603801 = Front Left (Driver)
@@ -77,9 +81,48 @@ public class VehicleCommandClient {
     }
 
     /**
+     * Sends a heartbeat ping to cloud indicating the head unit is awake & online.
+     */
+    public void sendHeartbeat() {
+        workerHandler.post(() -> {
+            long now = System.currentTimeMillis();
+            if (now - lastPingTimeMs < PING_INTERVAL_MS) {
+                return;
+            }
+            try {
+                HttpURLConnection conn = (HttpURLConnection) new URL(PING_URL).openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(4000);
+                conn.setReadTimeout(4000);
+
+                JSONObject body = new JSONObject();
+                body.put("installationId", installationId);
+                body.put("source", "fatihsmg4-headunit");
+
+                byte[] out = body.toString().getBytes(StandardCharsets.UTF_8);
+                try (OutputStream os = conn.getOutputStream()) {
+                    os.write(out);
+                }
+
+                int code = conn.getResponseCode();
+                if (code == 200) {
+                    lastPingTimeMs = now;
+                    Log.d(TAG, "Heartbeat ping sent successfully");
+                }
+                conn.disconnect();
+            } catch (Exception e) {
+                Log.d(TAG, "Heartbeat ping skipped/failed: " + e.getMessage());
+            }
+        });
+    }
+
+    /**
      * Called periodically by AbrpUploadService (e.g. every 15s).
      */
     public void pollAndExecute() {
+        sendHeartbeat();
         if (isExecuting.get()) return;
 
         workerHandler.post(() -> {
@@ -111,6 +154,22 @@ public class VehicleCommandClient {
                     String cmdId = cmd.getString("commandId");
                     String action = cmd.getString("action");
                     JSONObject params = cmd.optJSONObject("params");
+                    String createdAtStr = cmd.optString("createdAt", "");
+
+                    // Çift güvenlik: Cihaz tarafında da 5 dakikadan eski komutları yoksay
+                    if (!createdAtStr.isEmpty()) {
+                        try {
+                            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US);
+                            sdf.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+                            java.util.Date createdDate = sdf.parse(createdAtStr);
+                            if (createdDate != null && (System.currentTimeMillis() - createdDate.getTime() > 5 * 60 * 1000L)) {
+                                Log.w(TAG, "Command " + cmdId + " expired (>5m old), skipping execution.");
+                                updateCommandStatus(cmdId, "failed", "Expired on client (>5m)");
+                                continue;
+                            }
+                        } catch (Exception ignored) {}
+                    }
+
                     Log.i(TAG, "New vehicle command received: " + cmdId + " action=" + action);
 
                     executeCommand(cmdId, action, params);
