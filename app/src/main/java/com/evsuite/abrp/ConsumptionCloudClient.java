@@ -34,7 +34,9 @@ final class ConsumptionCloudClient {
     private static final long HISTORY_FETCH_INTERVAL_MS = 5 * 60_000L;
     private static final int TIMEOUT_MS = 8_000;
     private static final String PREFS = "consumption_cloud";
-    private static final String CHUNK_CACHE = "chunk_cache";   // JSON array of pending chunks
+    private static final String LAST_UPLOADED_DATE = "last_uploaded_date";
+    private static final String CHUNK_CACHE = "chunk_cache";   // Legacy JSON array of pending chunks
+    private static final int MAX_DAYS_PER_SYNC = 10;
     private static final int MAX_CHARGES_PER_SYNC = 10;
 
     private final String endpoint;
@@ -76,14 +78,9 @@ final class ConsumptionCloudClient {
     }
 
     /**
-     * Every 30 minutes, takes a delta chunk from the tracker and sends it. Chunks that fail
-     * to send (offline, server error) accumulate in a local cache and are retried on the
-     * next cycle — so a drive through a dead-signal area still reaches the cloud once the
-     * head unit is back on the hotspot. Every attempt is logged to the in-app "Kayıtlar" tab.
-     *
-     * @param nowMs wall clock, recorded with the payload — the throttle below runs on a
-     *              monotonic clock instead, so a backwards NTP correction cannot stall
-     *              syncing for however long the jump was.
+     * Drains pending daily consumption records for completed past days.
+     * Today's consumption accumulates locally and is NOT sent until the day ends (tomorrow).
+     * For example, on Oct 30, only completed days up to Oct 29 are uploaded.
      */
     void syncIfDue(ConsumptionTracker tracker, ChargeSessionTracker charges, long nowMs) {
         long elapsed = android.os.SystemClock.elapsedRealtime();
@@ -93,46 +90,57 @@ final class ConsumptionCloudClient {
         }
         syncPendingChargesIfDue(charges, elapsed);
 
-        // Drain any cached chunks first — a backlog from an offline period has priority.
-        int cached = drainChunkCache();
-        if (cached > 0) {
-            logEvent(true, 200, "Cache boşaltıldı: " + cached + " chunk gönderildi");
-            invalidateHistory();
-        }
-
         boolean due = lastConsumptionAttemptMs == 0L
                 || elapsed - lastConsumptionAttemptMs >= CONSUMPTION_SYNC_INTERVAL_MS;
         if (!due) return;
         lastConsumptionAttemptMs = elapsed;
 
-        ConsumptionTracker.CloudSnapshot chunk = tracker.takeChunkDelta();
-        if (chunk == null) {
-            Log.i(TAG, "Sync due but no new consumption since last chunk");
-            return;  // no driving since the last chunk
-        }
-        Log.i(TAG, "New chunk for " + chunk.date + ": +" + String.format("%.1f", chunk.day.km)
-                + "km, +" + String.format("%.2f", chunk.day.kwh) + "kWh");
+        if (tracker == null) return;
+        syncCompletedDailyConsumption(tracker, nowMs);
+    }
+
+    private void syncCompletedDailyConsumption(ConsumptionTracker tracker, long nowMs) {
+        String saved = prefs.getString(LAST_UPLOADED_DATE, "");
+        LocalDate lastUploaded = null;
         try {
-            JSONObject body = consumptionBody(chunk, nowMs);
-            if (send("/v1/consumption/daily", "PUT", body)) {
-                logEvent(true, 200, "Chunk " + chunk.date + " gönderildi (+"
-                        + String.format("%.1f", chunk.day.km) + "km, +"
-                        + String.format("%.2f", chunk.day.kwh) + "kWh)");
-                invalidateHistory();
-            } else {
-                cacheChunk(body);
-                int pending = pendingChunkCount();
-                logEvent(false, 0, "Chunk gönderilemedi — cache'de bekliyor (" + pending + " chunk)");
+            if (saved != null && !saved.isEmpty()) lastUploaded = LocalDate.parse(saved);
+        } catch (RuntimeException ignored) { }
+
+        int sent = 0;
+        for (int i = 0; i < MAX_DAYS_PER_SYNC; i++) {
+            LocalDate target = tracker.nextStoredDayAfter(lastUploaded);
+            if (target == null) break;
+
+            ConsumptionTracker.Totals dayTotals = tracker.totalsForDay(target);
+            if (dayTotals.km < 0.001 && dayTotals.kwh < 0.001 && dayTotals.hours < 0.001 && dayTotals.soc < 0.001) {
+                // Günün verisi yok/sıfırsa atlayıp son yüklenen olarak işaretle
+                prefs.edit().putString(LAST_UPLOADED_DATE, target.toString()).apply();
+                lastUploaded = target;
+                continue;
             }
-        } catch (Exception e) {
-            // Network failure: cache the chunk for the next cycle.
+
+            ConsumptionTracker.CloudSnapshot snapshot = tracker.cloudSnapshot(target);
             try {
-                JSONObject body = consumptionBody(chunk, nowMs);
-                cacheChunk(body);
-            } catch (Exception ignored) { }
-            int pending = pendingChunkCount();
-            logEvent(false, 0, "Çevrimdışı — cache'de bekliyor (" + pending + " chunk): " + e.getMessage());
-            Log.w(TAG, "Chunk sync failed, cached: " + e.getMessage());
+                JSONObject body = consumptionBody(snapshot, nowMs);
+                if (send("/v1/consumption/daily", "PUT", body)) {
+                    prefs.edit().putString(LAST_UPLOADED_DATE, target.toString()).apply();
+                    lastUploaded = target;
+                    sent++;
+                    logEvent(true, 200, "Günlük veri (" + target + ") gönderildi: "
+                            + String.format(java.util.Locale.US, "%.1f km, %.2f kWh", dayTotals.km, dayTotals.kwh));
+                    invalidateHistory();
+                } else {
+                    logEvent(false, 0, "Günlük veri (" + target + ") gönderilemedi (sunucu reddetti)");
+                    break;
+                }
+            } catch (Exception e) {
+                logEvent(false, 0, "Günlük veri (" + target + ") gönderilemedi: " + e.getMessage());
+                Log.w(TAG, "Daily sync failed for " + target + ": " + e.getMessage());
+                break;
+            }
+        }
+        if (sent > 0) {
+            Log.i(TAG, "Sync complete: " + sent + " day(s) uploaded");
         }
     }
 
@@ -327,7 +335,7 @@ final class ConsumptionCloudClient {
     }
 
     /**
-     * Immediately attempts to send pending charges and consumption chunks, ignoring throttles.
+     * Immediately attempts to send pending charges and completed days, ignoring throttles.
      * Called from the UI "Şimdi yükle" button.
      */
     String flushNow(ConsumptionTracker tracker, ChargeSessionTracker charges, long nowMs) {
@@ -351,55 +359,71 @@ final class ConsumptionCloudClient {
             }
         }
 
-        int cached = drainChunkCache();
-        ConsumptionTracker.CloudSnapshot chunk = tracker != null ? tracker.takeChunkDelta() : null;
-        int chunksUploaded = cached;
-        if (chunk != null) {
+        // Send any cached old chunks if there were any
+        int cachedChunks = drainChunkCache();
+
+        int daysUploaded = 0;
+        if (tracker != null) {
+            String saved = prefs.getString(LAST_UPLOADED_DATE, "");
+            LocalDate lastUploaded = null;
             try {
-                JSONObject body = consumptionBody(chunk, nowMs);
-                if (send("/v1/consumption/daily", "PUT", body)) {
-                    chunksUploaded++;
-                    invalidateHistory();
-                } else {
-                    cacheChunk(body);
+                if (saved != null && !saved.isEmpty()) lastUploaded = LocalDate.parse(saved);
+            } catch (RuntimeException ignored) { }
+
+            while (true) {
+                LocalDate target = tracker.nextStoredDayAfter(lastUploaded);
+                if (target == null) break;
+
+                ConsumptionTracker.Totals dayTotals = tracker.totalsForDay(target);
+                if (dayTotals.km < 0.001 && dayTotals.kwh < 0.001 && dayTotals.hours < 0.001 && dayTotals.soc < 0.001) {
+                    prefs.edit().putString(LAST_UPLOADED_DATE, target.toString()).apply();
+                    lastUploaded = target;
+                    continue;
                 }
-            } catch (Exception e) {
-                try { cacheChunk(consumptionBody(chunk, nowMs)); } catch (Exception ignored) { }
+
+                ConsumptionTracker.CloudSnapshot snapshot = tracker.cloudSnapshot(target);
+                try {
+                    JSONObject body = consumptionBody(snapshot, nowMs);
+                    if (send("/v1/consumption/daily", "PUT", body)) {
+                        prefs.edit().putString(LAST_UPLOADED_DATE, target.toString()).apply();
+                        lastUploaded = target;
+                        daysUploaded++;
+                        invalidateHistory();
+                    } else {
+                        break;
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "flushNow daily sync failed for " + target + ": " + e.getMessage());
+                    break;
+                }
             }
         }
-        int chunksPending = pendingChunkCount();
 
         StringBuilder sb = new StringBuilder();
-        if (chunksUploaded > 0 || chargesUploaded > 0) {
-            if (chunksUploaded > 0) sb.append(chunksUploaded).append(" chunk");
+        int totalUploaded = daysUploaded + cachedChunks;
+        if (totalUploaded > 0 || chargesUploaded > 0) {
+            if (daysUploaded > 0) sb.append(daysUploaded).append(" gün");
+            if (cachedChunks > 0) {
+                if (daysUploaded > 0) sb.append(" (+");
+                sb.append(cachedChunks).append(" eski chunk");
+                if (daysUploaded > 0) sb.append(")");
+            }
             if (chargesUploaded > 0) {
-                if (chunksUploaded > 0) sb.append(", ");
+                if (totalUploaded > 0) sb.append(", ");
                 sb.append(chargesUploaded).append(" şarj oturumu");
             }
             sb.append(" yüklendi");
-            if (chunksPending > 0 || chargesPending > 0) {
-                sb.append(" (");
-                if (chunksPending > 0) sb.append(chunksPending).append(" chunk");
-                if (chargesPending > 0) {
-                    if (chunksPending > 0) sb.append(", ");
-                    sb.append(chargesPending).append(" şarj");
-                }
-                sb.append(" bekliyor)");
-            }
-        } else if (chunksPending > 0 || chargesPending > 0) {
-            sb.append("Yüklenemedi (internet?) — ");
-            if (chunksPending > 0) sb.append(chunksPending).append(" chunk");
             if (chargesPending > 0) {
-                if (chunksPending > 0) sb.append(", ");
-                sb.append(chargesPending).append(" şarj");
+                sb.append(" (").append(chargesPending).append(" şarj bekliyor)");
             }
-            sb.append(" bekliyor");
+        } else if (chargesPending > 0) {
+            sb.append("Yüklenemedi (internet?) — ").append(chargesPending).append(" şarj bekliyor");
         } else {
-            sb.append("Yüklenecek yeni veri yok");
+            sb.append("Yüklenecek yeni geçmiş gün verisi yok (bugünün verisi yarın gönderilecek)");
         }
 
         String msg = sb.toString();
-        logEvent(chunksUploaded > 0 || chargesUploaded > 0, (chunksUploaded > 0 || chargesUploaded > 0) ? 200 : 0, "Manuel sync: " + msg);
+        logEvent(totalUploaded > 0 || chargesUploaded > 0, (totalUploaded > 0 || chargesUploaded > 0) ? 200 : 0, "Manuel sync: " + msg);
         return msg;
     }
 
